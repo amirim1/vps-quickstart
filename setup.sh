@@ -452,7 +452,7 @@ I18N_EN[
 I18N_EN[
 "no"]="No"
 I18N_EN[
-"back"]="Back to Main Menu"
+"select_option"]="Select option"
 
 # Russian translations
 I18N_RU[
@@ -812,6 +812,8 @@ I18N_RU[
 I18N_RU[
 "no"]="Нет"
 I18N_RU[
+"select_option"]="Выберите вариант"
+I18N_RU[
 "back"]="Назад в главное меню"
 
 # Translation function
@@ -924,7 +926,7 @@ confirm() {
 # Check if running as root
 check_root() {
     if [[ $EUID -ne 0 ]]; then
-        err "This script must be run as root"
+        err "$(_ "must_run_as_root")"
         return 1
     fi
     return 0
@@ -1240,24 +1242,28 @@ print_header() {
 
 # Print menu
 print_menu() {
-    echo -e "${BOLD}════════════════════════════ MENU ════════════════════════════${NC}"
-    echo -e "  ${GREEN}1)${NC}  Update System"
-    echo -e "  ${GREEN}2)${NC}  Install Base Packages"
-    echo -e "  ${GREEN}3)${NC}  Configure SSH"
-    echo -e "  ${GREEN}4)${NC}  Configure Firewall (UFW)"
-    echo -e "  ${GREEN}5)${NC}  Install Fail2Ban"
-    echo -e "  ${GREEN}6)${NC}  Create Swap File"
-    echo -e "  ${GREEN}7)${NC}  Enable BBR"
-    echo -e "  ${GREEN}8)${NC}  Manage IPv6"
-    echo -e "  ${GREEN}9)${NC}  Server Information"
-    echo -e "  ${GREEN}10)${NC} Network Connectivity Test"
-    echo -e "  ${GREEN}11)${NC} Speed Test"
-    echo -e "  ${GREEN}12)${NC} Domain Check"
-    echo -e "  ${GREEN}13)${NC} Install 3x-ui Panel"
-    echo -e "  ${GREEN}14)${NC} Create User"
-    echo -e "  ${GREEN}15)${NC} Configure Sudo (Passwordless)"
-    echo -e "  ${RED}16)${NC} Exit"
-    echo -e "${BOLD}═══════════════════════════════════════════════════════════════${NC}"
+    local menu_title="MENU"
+    if [[ "$CURRENT_LANG" == "ru" ]]; then
+        menu_title="МЕНЮ"
+    fi
+    echo -e "${BOLD}════════════════════════════ $menu_title ════════════════════════════${NC}"
+    echo -e "  ${GREEN}1)${NC}  $(_ "update_system")"
+    echo -e "  ${GREEN}2)${NC}  $(_ "install_base_packages")"
+    echo -e "  ${GREEN}3)${NC}  $(_ "configure_ssh")"
+    echo -e "  ${GREEN}4)${NC}  $(_ "configure_firewall")"
+    echo -e "  ${GREEN}5)${NC}  $(_ "install_fail2ban")"
+    echo -e "  ${GREEN}6)${NC}  $(_ "create_swap")"
+    echo -e "  ${GREEN}7)${NC}  $(_ "enable_bbr")"
+    echo -e "  ${GREEN}8)${NC}  $(_ "manage_ipv6")"
+    echo -e "  ${GREEN}9)${NC}  $(_ "server_info")"
+    echo -e "  ${GREEN}10)${NC} $(_ "network_test")"
+    echo -e "  ${GREEN}11)${NC} $(_ "speed_test")"
+    echo -e "  ${GREEN}12)${NC} $(_ "domain_check")"
+    echo -e "  ${GREEN}13)${NC} $(_ "install_3xui")"
+    echo -e "  ${GREEN}14)${NC} $(_ "create_user")"
+    echo -e "  ${GREEN}15)${NC} $(_ "configure_sudo")"
+    echo -e "  ${RED}16)${NC} $(_ "exit")"
+    echo -e "${BOLD}═══════════════════════════════════════════════════════════════════════${NC}"
 }
 
 # =============================================================================
@@ -1266,53 +1272,53 @@ print_menu() {
 
 # 1. Update System
 update_system() {
-    info "Updating package list..."
+    info "$(_ "updating_package_list")"
     apt_update || return 1
 
-    info "Upgrading packages..."
+    info "$(_ "upgrading_packages")"
     wait_apt_lock || return 1
     local output
     output=$(apt-get upgrade -y 2>&1)
     local rc=${PIPESTATUS[0]}
 
     if [[ $rc -eq 0 ]]; then
-        ok "Packages upgraded"
+        ok "$(_ "packages_upgraded")"
     else
-        err "Upgrade failed (code: $rc)"
+        err "$(_ "upgrade_failed") (code: $rc)"
         echo "$output" | tail -20 >&2
         return 1
     fi
 
-    info "Removing unused packages..."
+    info "$(_ "removing_unused")"
     output=$(apt-get autoremove -y 2>&1)
     rc=${PIPESTATUS[0]}
     if [[ $rc -ne 0 ]]; then
-        warn "autoremove returned code $rc"
+        warn "$(_ "autoremove_failed") $rc"
         echo "$output" | tail -10 >&2
     fi
 
     output=$(apt-get autoclean -y 2>&1)
     rc=${PIPESTATUS[0]}
     if [[ $rc -ne 0 ]]; then
-        warn "autoclean returned code $rc"
+        warn "$(_ "autoclean_failed") $rc"
         echo "$output" | tail -10 >&2
     fi
 
-    ok "Cleanup complete"
+    ok "$(_ "cleanup_complete")"
     return 0
 }
 
 # 2. Install Base Packages
 install_base_packages() {
-    info "Installing base packages: ${PACKAGES[*]}"
+    info "$(_ "installing_base"): ${PACKAGES[*]}"
     install_packages "${PACKAGES[@]}" || return 1
-    ok "All base packages processed"
+    ok "$(_ "all_base_installed")"
     return 0
 }
 
 # 3. Configure SSH
 configure_ssh() {
-    info "Configuring SSH..."
+    info "$(_ "configuring_ssh")"
 
     # Backup current config
     backup_file "$SSH_CONFIG_FILE"
@@ -1320,22 +1326,22 @@ configure_ssh() {
     # Get current port
     local current_port
     current_port=$(get_current_ssh_port)
-    info "Current SSH port: $current_port"
+    info "$(_ "current_ssh_port"): $current_port"
 
     # Get new port
     local new_port
     while true; do
-        read -r -p "$(echo -e "${YELLOW}Enter SSH port [$current_port]: ${NC}")" new_port
+        read -r -p "$(echo -e "${YELLOW}$(_ "enter_ssh_port") [$current_port]: ${NC}")" new_port
         new_port=${new_port:-$current_port}
         if [[ "$new_port" =~ ^[0-9]+$ ]] && (( new_port >= 1 && new_port <= 65535 )); then
             break
         fi
-        err "Invalid port. Must be 1-65535"
+        err "$(_ "invalid_port")"
     done
 
     # Disable password auth?
     local disable_password
-    if confirm "Disable password authentication? (key-only login)" "N"; then
+    if confirm "$(_ "disable_password_auth")" "N"; then
         disable_password="no"
     else
         disable_password="yes"
@@ -1343,14 +1349,14 @@ configure_ssh() {
 
     # Disable root login?
     local disable_root
-    if confirm "Disable root login?" "Y"; then
+    if confirm "$(_ "disable_root_login")" "Y"; then
         disable_root="no"
     else
         disable_root="yes"
     fi
 
     # Apply changes
-    info "Applying SSH configuration..."
+    info "$(_ "applying_ssh")"
 
     # Port
     sed -i "s/^#*Port .*/Port $new_port/" "$SSH_CONFIG_FILE"
@@ -1370,7 +1376,7 @@ configure_ssh() {
 
     # Test config
     if ! test_ssh_config; then
-        err "SSH config test failed. Restoring backup..."
+        err "$(_ "ssh_config_failed")"
         restore_file "$SSH_CONFIG_FILE"
         return 1
     fi
@@ -1378,23 +1384,23 @@ configure_ssh() {
     CACHED_SSH_PORT="$new_port"
     restart_service ssh || return 1
 
-    ok "SSH configured on port $new_port"
-    warn "IMPORTANT: Ensure you have SSH key access before disconnecting!"
+    ok "$(_ "ssh_configured") $new_port"
+    warn "$(_ "ssh_warning")"
     return 0
 }
 
 # 4. Configure Firewall (UFW)
 configure_firewall() {
-    info "Configuring UFW firewall..."
+    info "$(_ "configuring_ufw")"
 
     install_package ufw || return 1
 
     # Warning about reset
-    if confirm "WARNING: This will reset ALL existing UFW rules. Continue?" "N"; then
+    if confirm "$(_ "ufw_reset_warning")" "N"; then
         ufw --force reset 2>/dev/null
-        ok "UFW rules reset"
+        ok "$(_ "ufw_rules_reset")"
     else
-        info "Skipping UFW reset"
+        info "$(_ "ufw_skipping_reset")"
     fi
 
     # Default policies
@@ -1405,22 +1411,22 @@ configure_firewall() {
     local ssh_port
     ssh_port=$(get_current_ssh_port)
     ufw allow "$ssh_port"/tcp comment "SSH"
-    ok "Allowed SSH port: $ssh_port"
+    ok "$(_ "configure_ssh") $ssh_port"
 
     # Allow additional ports
     for port in "${UFW_PORTS[@]}"; do
         if [[ "$port" != "$ssh_port" ]]; then
             ufw allow "$port"/tcp comment "Service"
-            ok "Allowed port: $port"
+            ok "$(_ "configure_firewall") $port"
         fi
     done
 
     # Enable UFW
-    if confirm "Enable UFW firewall now?" "Y"; then
+    if confirm "$(_ "ufw_enabled")" "Y"; then
         ufw --force enable
-        ok "UFW enabled"
+        ok "$(_ "ufw_enabled")"
     else
-        warn "UFW configured but not enabled"
+        warn "$(_ "ufw_not_enabled")"
     fi
 
     ufw status verbose
@@ -1429,7 +1435,7 @@ configure_firewall() {
 
 # 5. Install Fail2Ban
 install_fail2ban() {
-    info "Installing Fail2Ban..."
+    info "$(_ "installing_fail2ban")"
 
     install_package fail2ban || return 1
 
@@ -1456,18 +1462,18 @@ EOF
 
     enable_service fail2ban
     restart_service fail2ban
-    ok "Fail2Ban installed and configured (monitoring port $ssh_port)"
+    ok "$(_ "fail2ban_configured") $ssh_port)"
     return 0
 }
 
 # 6. Create Swap
 create_swap() {
     if [[ -f "$SWAP_FILE" ]]; then
-        warn "Swap file already exists: $SWAP_FILE"
+        warn "$(_ "swap_exists"): $SWAP_FILE"
         local size
         size=$(ls -lh "$SWAP_FILE" | awk '{print $5}')
-        info "Current size: $size"
-        if ! confirm "Recreate swap file?" "N"; then
+        info "$(_ "current_size"): $size"
+        if ! confirm "$(_ "recreate_swap")" "N"; then
             return 0
         fi
         swapoff "$SWAP_FILE" 2>/dev/null || true
@@ -1476,28 +1482,28 @@ create_swap() {
 
     local size_gb
     while true; do
-        read -r -p "$(echo -e "${YELLOW}Enter swap size in GB (e.g., 2, 4): ${NC}")" size_gb
+        read -r -p "$(echo -e "${YELLOW}$(_ "enter_swap_size"): ${NC}")" size_gb
         if [[ "$size_gb" =~ ^[0-9]+$ ]] && (( size_gb >= 1 && size_gb <= 64 )); then
             break
         fi
-        err "Invalid size. Enter 1-64 GB"
+        err "$(_ "invalid_swap_size")"
     done
 
     # Check disk space
     local available_gb
     available_gb=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
     if (( size_gb + 2 > available_gb )); then
-        err "Not enough disk space. Available: ${available_gb}GB, requested: ${size_gb}GB (+2GB buffer)"
+        err "$(_ "not_enough_space"): ${available_gb}GB, $(_ "requested"): ${size_gb}GB (+2GB buffer)"
         return 1
     fi
 
-    info "Creating ${size_gb}GB swap file..."
+    info "$(_ "creating_swap")"
     if fallocate -l "${size_gb}G" "$SWAP_FILE" 2>/dev/null; then
         : # success
     else
-        info "fallocate failed, using dd (slower)..."
+        info "$(_ "fallocate_failed")"
         if ! dd if=/dev/zero of="$SWAP_FILE" bs=1M count=$((size_gb * 1024)) status=progress 2>&1; then
-            err "Failed to create swap file with dd"
+            err "$(_ "dd_failed")"
             rm -f "$SWAP_FILE"
             return 1
         fi
@@ -1505,13 +1511,13 @@ create_swap() {
 
     chmod 600 "$SWAP_FILE"
     if ! mkswap "$SWAP_FILE" 2>/dev/null; then
-        err "mkswap failed"
+        err "$(_ "mkswap_failed")"
         rm -f "$SWAP_FILE"
         return 1
     fi
 
     if ! swapon "$SWAP_FILE" 2>/dev/null; then
-        err "swapon failed"
+        err "$(_ "swapon_failed")"
         rm -f "$SWAP_FILE"
         return 1
     fi
@@ -1521,14 +1527,14 @@ create_swap() {
         echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab
     fi
 
-    ok "Swap created: ${size_gb}GB"
+    ok "$(_ "swap_created"): ${size_gb}GB"
     swapon --show
     return 0
 }
 
 # 7. Enable BBR
 enable_bbr() {
-    info "Enabling BBR congestion control..."
+    info "$(_ "enabling_bbr")"
 
     if ! check_kernel_version; then
         return 1
@@ -1536,7 +1542,7 @@ enable_bbr() {
 
     # Check if already enabled
     if sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
-        ok "BBR already enabled"
+        ok "$(_ "bbr_already_enabled")"
         return 0
     fi
 
@@ -1547,15 +1553,15 @@ net.ipv4.tcp_congestion_control = bbr
 EOF
 
     if ! sysctl --system 2>/dev/null; then
-        err "sysctl --system failed"
+        err "$(_ "bbr_failed")"
         return 1
     fi
 
     if sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
-        ok "BBR enabled successfully"
+        ok "$(_ "bbr_enabled")"
         return 0
     else
-        err "Failed to enable BBR"
+        err "$(_ "bbr_failed")"
         return 1
     fi
 }
@@ -1564,28 +1570,32 @@ EOF
 manage_ipv6() {
     while true; do
         print_header
-        echo -e "${BOLD}════════════════════════════ IPv6 MANAGEMENT ════════════════════════════${NC}"
-        echo -e "  ${GREEN}1)${NC} Disable IPv6"
-        echo -e "  ${GREEN}2)${NC} Enable IPv6"
-        echo -e "  ${GREEN}3)${NC} Check IPv6 Status"
-        echo -e "  ${RED}4)${NC} Back to Main Menu"
+        local ipv6_title="IPv6 MANAGEMENT"
+        if [[ "$CURRENT_LANG" == "ru" ]]; then
+            ipv6_title="УПРАВЛЕНИЕ IPv6"
+        fi
+        echo -e "${BOLD}════════════════════════════ $ipv6_title ════════════════════════════${NC}"
+        echo -e "  ${GREEN}1)${NC} $(_ "disabling_ipv6")"
+        echo -e "  ${GREEN}2)${NC} $(_ "enabling_ipv6")"
+        echo -e "  ${GREEN}3)${NC} $(_ "ipv6_status")"
+        echo -e "  ${RED}4)${NC} $(_ "back")"
         echo -e "${BOLD}═══════════════════════════════════════════════════════════════════════${NC}"
 
-        read -r -p "$(echo -e "${YELLOW}Select option [1-4]: ${NC}")" choice
+        read -r -p "$(echo -e "${YELLOW}$(_ "select_option") [1-4]: ${NC}")" choice
 
         case "$choice" in
             1) disable_ipv6 ;;
             2) enable_ipv6 ;;
             3) check_ipv6_status ;;
             4) return 0 ;;
-            *) err "Invalid option" ;;
+            *) err "$(_ "invalid_option")" ;;
         esac
         press_any_key
     done
 }
 
 disable_ipv6() {
-    info "Disabling IPv6..."
+    info "$(_ "disabling_ipv6")"
     cat > /etc/sysctl.d/99-disable-ipv6.conf <<'EOF'
 net.ipv6.conf.all.disable_ipv6 = 1
 net.ipv6.conf.default.disable_ipv6 = 1
@@ -1604,11 +1614,11 @@ EOF
         fi
     fi
 
-    ok "IPv6 disabled (requires reboot for full effect)"
+    ok "$(_ "ipv6_disabled")"
 }
 
 enable_ipv6() {
-    info "Enabling IPv6..."
+    info "$(_ "enabling_ipv6")"
     rm -f /etc/sysctl.d/99-disable-ipv6.conf
     if ! sysctl --system 2>/dev/null; then
         warn "sysctl --system returned non-zero"
@@ -1622,28 +1632,28 @@ enable_ipv6() {
         fi
     fi
 
-    ok "IPv6 enabled (requires reboot for full effect)"
+    ok "$(_ "ipv6_enabled")"
 }
 
 check_ipv6_status() {
-    info "IPv6 Status:"
+    info "$(_ "ipv6_status")"
     local disabled
     disabled=$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null)
     if [[ "$disabled" == "1" ]]; then
-        echo -e "  ${RED}IPv6: DISABLED${NC} (via sysctl)"
+        echo -e "  ${RED}$(_ "ipv6_disabled_sysctl")${NC}"
     else
-        echo -e "  ${GREEN}IPv6: ENABLED${NC} (via sysctl)"
+        echo -e "  ${GREEN}$(_ "ipv6_enabled_sysctl")${NC}"
     fi
 
     local ipv6_addr="$CACHED_PUBLIC_IPV6"
     if [[ -n "$ipv6_addr" ]]; then
-        echo -e "  ${GREEN}Public IPv6:${NC} $ipv6_addr"
+        echo -e "  ${GREEN}$(_ "public_ipv6"):${NC} $ipv6_addr"
     else
-        echo -e "  ${YELLOW}Public IPv6:${NC} Not detected"
+        echo -e "  ${YELLOW}$(_ "public_ipv6"):${NC} $(_ "not_detected")"
     fi
 
     # Check interfaces
-    echo -e "  ${BLUE}Interfaces with IPv6:${NC}"
+    echo -e "  ${BLUE}$(_ "interfaces_with_ipv6"):${NC}"
     ip -6 addr show scope global 2>/dev/null | grep -E '^ [0-9]+:|inet6' | head -20 | while IFS= read -r line; do
         echo "    $line"
     done
