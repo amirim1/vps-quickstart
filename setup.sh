@@ -1,18 +1,40 @@
 #!/usr/bin/env bash
 ################################################################################
 # VPS QuickStart - Professional Server Setup Script
-# Version: 1.0.0
+# Version: 1.1.0
 # Repository: https://github.com/your-repo/vps-quickstart
 # License: MIT
+# Author: Senior Linux Engineer
+#
+# Usage:
+#   bash <(curl -fsSL https://raw.githubusercontent.com/your-repo/main/setup.sh)
+#   bash setup.sh
 ################################################################################
+
+# =============================================================================
+# SHELL STRICTNESS
+# =============================================================================
+set -o pipefail
+shopt -s inherit_errexit 2>/dev/null || true
 
 # =============================================================================
 # CURL-BASH SUPPORT: If piped, download and execute locally
 # =============================================================================
 if [[ ! -t 0 ]]; then
+    SCRIPT_URL="https://raw.githubusercontent.com/your-repo/vps-quickstart/main/setup.sh"
     TEMP_SCRIPT=$(mktemp --suffix=.sh)
     trap 'rm -f "$TEMP_SCRIPT"' EXIT
-    curl -fsSL "https://raw.githubusercontent.com/your-repo/vps-quickstart/main/setup.sh" > "$TEMP_SCRIPT"
+
+    if ! curl -fsSL "$SCRIPT_URL" > "$TEMP_SCRIPT"; then
+        echo "[✗] Failed to download script from $SCRIPT_URL" >&2
+        exit 1
+    fi
+
+    if [[ ! -s "$TEMP_SCRIPT" ]]; then
+        echo "[✗] Downloaded script is empty" >&2
+        exit 1
+    fi
+
     bash "$TEMP_SCRIPT"
     exit $?
 fi
@@ -20,7 +42,7 @@ fi
 # =============================================================================
 # CONFIGURATION SECTION - All parameters in one place
 # =============================================================================
-readonly SCRIPT_VERSION="1.0.0"
+readonly SCRIPT_VERSION="1.1.0"
 readonly SCRIPT_NAME="VPS QuickStart"
 readonly SCRIPT_REPO="https://raw.githubusercontent.com/your-repo/vps-quickstart/main"
 
@@ -32,8 +54,7 @@ readonly PACKAGES=(
 
 # SSH Configuration
 readonly SSH_CONFIG_FILE="/etc/ssh/sshd_config"
-readonly SSH_CONFIG_BACKUP="/etc/ssh/sshd_config.backup.$(date +%s)"
-SSH_PORT=22
+readonly SSH_CONFIG_BACKUP="/etc/ssh/sshd_config.backup.$(date +%s%N)"
 
 # UFW Configuration
 readonly UFW_PORTS=(22 80 443)
@@ -53,6 +74,10 @@ readonly XUI_INSTALL_URL="https://raw.githubusercontent.com/mhsanaei/3x-ui/maste
 # Logging
 readonly LOG_FILE="/var/log/vps-quickstart.log"
 
+# OS Requirements
+readonly MIN_DEBIAN_VERSION="12"
+readonly MIN_UBUNTU_VERSION="22.04"
+
 # Colors
 readonly RED='\033[0;31m'
 readonly GREEN='\033[0;32m'
@@ -63,15 +88,32 @@ readonly BOLD='\033[1m'
 readonly NC='\033[0m' # No Color
 
 # =============================================================================
-# UTILITY FUNCTIONS
+# GLOBAL STATE (cached)
+# =============================================================================
+CACHED_PUBLIC_IP=""
+CACHED_PUBLIC_IPV6=""
+CACHED_SSH_PORT=""
+
+# =============================================================================
+# SIGNAL HANDLERS
+# =============================================================================
+cleanup() {
+    info "Interrupted by user. Cleaning up..."
+    exit 130
+}
+trap cleanup INT TERM
+
+# =============================================================================
+# LOGGING FUNCTIONS
 # =============================================================================
 
-# Logging functions
-log() {
+# Core logger - writes clean text to log, colored text to terminal
+_log() {
     local level="$1"
     shift
     local message="$*"
-    local timestamp=$(date '+%Y-%m-%d %H:%M:%S')
+    local timestamp
+    timestamp=$(date '+%Y-%m-%d %H:%M:%S')
     local color=""
     local prefix=""
 
@@ -83,13 +125,20 @@ log() {
         *)     color="$NC";    prefix="[$level]" ;;
     esac
 
-    echo -e "${color}${prefix}${NC} $message" | tee -a "$LOG_FILE"
+    # Terminal: colored
+    echo -e "${color}${prefix}${NC} $message"
+    # Log file: plain text
+    echo "${timestamp} ${prefix} ${message}" >> "$LOG_FILE"
 }
 
-info()  { log "INFO" "$@"; }
-ok()    { log "OK" "$@"; }
-warn()  { log "WARN" "$@"; }
-err()   { log "ERR" "$@"; }
+info()  { _log "INFO" "$@"; }
+ok()    { _log "OK" "$@"; }
+warn()  { _log "WARN" "$@"; }
+err()   { _log "ERR" "$@"; }
+
+# =============================================================================
+# UTILITY FUNCTIONS
+# =============================================================================
 
 # Confirmation prompt
 confirm() {
@@ -117,34 +166,46 @@ check_root() {
     return 0
 }
 
-# Check OS compatibility
+# Check OS compatibility with version
 check_os() {
     if [[ ! -f /etc/os-release ]]; then
         err "Cannot detect OS: /etc/os-release not found"
         return 1
     fi
 
+    # shellcheck source=/dev/null
     source /etc/os-release
     local supported=false
+    local min_version=""
 
     case "$ID" in
-        ubuntu|debian)
-            supported=true
+        ubuntu)
+            min_version="$MIN_UBUNTU_VERSION"
+            if [[ "$(printf '%s\n' "$min_version" "$VERSION_ID" | sort -V | head -n1)" == "$min_version" ]]; then
+                supported=true
+            fi
+            ;;
+        debian)
+            min_version="$MIN_DEBIAN_VERSION"
+            if [[ "$(printf '%s\n' "$min_version" "$VERSION_ID" | sort -V | head -n1)" == "$min_version" ]]; then
+                supported=true
+            fi
             ;;
     esac
 
     if [[ "$supported" != true ]]; then
-        err "Unsupported OS: $PRETTY_NAME. Only Ubuntu/Debian supported."
+        err "Unsupported OS: $PRETTY_NAME (required: Ubuntu ${MIN_UBUNTU_VERSION}+ or Debian ${MIN_DEBIAN_VERSION}+)"
         return 1
     fi
 
-    info "OS detected: $PRETTY_NAME"
+    info "OS detected: $PRETTY_NAME ($VERSION_ID)"
     return 0
 }
 
 # Check architecture
 check_arch() {
-    local arch=$(uname -m)
+    local arch
+    arch=$(uname -m)
     case "$arch" in
         x86_64|aarch64|arm64)
             info "Architecture: $arch"
@@ -159,7 +220,8 @@ check_arch() {
 
 # Check kernel version for BBR
 check_kernel_version() {
-    local current=$(uname -r | cut -d. -f1,2)
+    local current
+    current=$(uname -r | cut -d. -f1,2)
     local required="$BBR_MIN_KERNEL"
 
     if [[ "$(printf '%s\n' "$required" "$current" | sort -V | head -n1)" != "$required" ]]; then
@@ -182,21 +244,41 @@ check_internet() {
     return 1
 }
 
-# Get public IP
+# Get public IP (cached)
 get_public_ip() {
-    local ip
+    if [[ -n "$CACHED_PUBLIC_IP" ]]; then
+        echo "$CACHED_PUBLIC_IP"
+        return 0
+    fi
+
+    local ip=""
     ip=$(curl -fsSL -4 --max-time 10 https://api.ipify.org 2>/dev/null) || \
     ip=$(curl -fsSL -4 --max-time 10 https://ifconfig.me 2>/dev/null) || \
     ip=$(curl -fsSL -4 --max-time 10 https://icanhazip.com 2>/dev/null)
+
+    CACHED_PUBLIC_IP="$ip"
     echo "$ip"
 }
 
-# Get public IPv6
+# Get public IPv6 (cached)
 get_public_ipv6() {
-    local ip
+    if [[ -n "$CACHED_PUBLIC_IPV6" ]]; then
+        echo "$CACHED_PUBLIC_IPV6"
+        return 0
+    fi
+
+    local ip=""
     ip=$(curl -fsSL -6 --max-time 10 https://api6.ipify.org 2>/dev/null) || \
     ip=$(curl -fsSL -6 --max-time 10 https://ifconfig.me 2>/dev/null)
+
+    CACHED_PUBLIC_IPV6="$ip"
     echo "$ip"
+}
+
+# Cache IPs on startup
+cache_ips() {
+    CACHED_PUBLIC_IP=$(curl -fsSL -4 --max-time 5 https://api.ipify.org 2>/dev/null) || true
+    CACHED_PUBLIC_IPV6=$(curl -fsSL -6 --max-time 5 https://api6.ipify.org 2>/dev/null) || true
 }
 
 # Wait for apt lock
@@ -215,34 +297,47 @@ wait_apt_lock() {
     return 0
 }
 
-# Update package list
+# Update package list with error handling
 apt_update() {
     wait_apt_lock || return 1
-    apt-get update -y 2>&1 | tail -20 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done
+    local output
+    output=$(apt-get update -y 2>&1)
+    local rc=${PIPESTATUS[0]}
+    if [[ $rc -ne 0 ]]; then
+        err "apt-get update failed (code: $rc)"
+        echo "$output" | tail -20 >&2
+        return 1
+    fi
+    ok "Package list updated"
+    return 0
 }
 
-# Install package_installed() {
+# Check if package is installed
+package_installed() {
     dpkg -l "$1" 2>/dev/null | grep -q ^ii
 }
 
-# Install package if not installed
+# Install single package with error handling
 install_package() {
     local pkg="$1"
     if package_installed "$pkg"; then
         ok "Package already installed: $pkg"
         return 0
     fi
+
     info "Installing: $pkg"
     wait_apt_lock || return 1
-    if apt-get install -y "$pkg" 2>&1 | tail -5 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done; then
+
+    local output
+    output=$(apt-get install -y "$pkg" 2>&1)
+    local rc=${PIPESTATUS[0]}
+
+    if [[ $rc -eq 0 ]]; then
         ok "Installed: $pkg"
         return 0
     else
-        err "Failed to install: $pkg"
+        err "Failed to install: $pkg (code: $rc)"
+        echo "$output" | tail -10 >&2
         return 1
     fi
 }
@@ -257,19 +352,21 @@ install_packages() {
     return $failed
 }
 
-# Backup file
+# Backup file with atomic naming
 backup_file() {
     local file="$1"
     if [[ -f "$file" ]]; then
-        cp "$file" "${file}.backup.$(date +%s)"
-        ok "Backed up: $file"
+        local backup_name="${file}.backup.$(date +%s%N)"
+        cp "$file" "$backup_name"
+        ok "Backed up: $file -> $backup_name"
     fi
 }
 
-# Restore file from backup
+# Restore file from most recent backup
 restore_file() {
     local file="$1"
-    local backup=$(ls -t "${file}.backup."* 2>/dev/null | head -1)
+    local backup
+    backup=$(ls -t "${file}.backup."* 2>/dev/null | head -1)
     if [[ -n "$backup" ]]; then
         cp "$backup" "$file"
         ok "Restored: $file from $backup"
@@ -290,17 +387,21 @@ test_ssh_config() {
     fi
 }
 
-# Restart service safely
+# Restart service safely with error handling
 restart_service() {
     local service="$1"
     info "Restarting service: $service"
-    if systemctl restart "$service" 2>&1 | tail -3 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done; then
+
+    local output
+    output=$(systemctl restart "$service" 2>&1)
+    local rc=${PIPESTATUS[0]}
+
+    if [[ $rc -eq 0 ]]; then
         ok "Service restarted: $service"
         return 0
     else
-        err "Failed to restart: $service"
+        err "Failed to restart: $service (code: $rc)"
+        echo "$output" | tail -5 >&2
         return 1
     fi
 }
@@ -329,22 +430,47 @@ press_any_key() {
     echo
 }
 
-# Print header
+# Get current SSH port from config
+get_current_ssh_port() {
+    if [[ -n "$CACHED_SSH_PORT" ]]; then
+        echo "$CACHED_SSH_PORT"
+        return 0
+    fi
+
+    local port=22
+    if [[ -f "$SSH_CONFIG_FILE" ]]; then
+        local config_port
+        config_port=$(grep -E "^\s*Port\s+[0-9]+" "$SSH_CONFIG_FILE" | tail -1 | awk '{print $2}')
+        [[ -n "$config_port" ]] && port="$config_port"
+    fi
+
+    CACHED_SSH_PORT="$port"
+    echo "$port"
+}
+
+# Print header (NO clear, NO HTTP requests)
 print_header() {
-    clear
     echo -e "${CYAN}${BOLD}"
     echo "╔══════════════════════════════════════════════════════════════╗"
     echo "║                    VPS QuickStart v${SCRIPT_VERSION}                   ║"
     echo "║              Professional Server Setup Script                ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-    echo -e "${BLUE}OS:${NC} $(source /etc/os-release && echo "$PRETTY_NAME")"
+
+    # Use cached values instead of HTTP requests
+    local os_info="Unknown"
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck source=/dev/null
+        source /etc/os-release
+        os_info="$PRETTY_NAME"
+    fi
+
+    echo -e "${BLUE}OS:${NC} $os_info"
     echo -e "${BLUE}Kernel:${NC} $(uname -r)"
     echo -e "${BLUE}Arch:${NC} $(uname -m)"
-    echo -e "${BLUE}Uptime:${NC} $(uptime -p 2>/dev/null || uptime)"
-    echo -e "${BLUE}IPv4:${NC} $(get_public_ip)"
-    local ipv6=$(get_public_ipv6)
-    [[ -n "$ipv6" ]] && echo -e "${BLUE}IPv6:${NC} $ipv6"
+    echo -e "${BLUE}Uptime:${NC} $(uptime -p 2>/dev/null || uptime | sed 's/.*up \([^,]*\),.*/\1/')"
+    echo -e "${BLUE}IPv4:${NC} ${CACHED_PUBLIC_IP:-Not detected}"
+    [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "${BLUE}IPv6:${NC} $CACHED_PUBLIC_IPV6"
     echo
 }
 
@@ -381,18 +507,33 @@ update_system() {
 
     info "Upgrading packages..."
     wait_apt_lock || return 1
-    if apt-get upgrade -y 2>&1 | tail -20 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done; then
+    local output
+    output=$(apt-get upgrade -y 2>&1)
+    local rc=${PIPESTATUS[0]}
+
+    if [[ $rc -eq 0 ]]; then
         ok "Packages upgraded"
     else
-        err "Upgrade failed"
+        err "Upgrade failed (code: $rc)"
+        echo "$output" | tail -20 >&2
         return 1
     fi
 
     info "Removing unused packages..."
-    apt-get autoremove -y 2>/dev/null
-    apt-get autoclean -y 2>/dev/null
+    output=$(apt-get autoremove -y 2>&1)
+    rc=${PIPESTATUS[0]}
+    if [[ $rc -ne 0 ]]; then
+        warn "autoremove returned code $rc"
+        echo "$output" | tail -10 >&2
+    fi
+
+    output=$(apt-get autoclean -y 2>&1)
+    rc=${PIPESTATUS[0]}
+    if [[ $rc -ne 0 ]]; then
+        warn "autoclean returned code $rc"
+        echo "$output" | tail -10 >&2
+    fi
+
     ok "Cleanup complete"
     return 0
 }
@@ -401,7 +542,7 @@ update_system() {
 install_base_packages() {
     info "Installing base packages: ${PACKAGES[*]}"
     install_packages "${PACKAGES[@]}" || return 1
-    ok "All base packages installed"
+    ok "All base packages processed"
     return 0
 }
 
@@ -412,11 +553,16 @@ configure_ssh() {
     # Backup current config
     backup_file "$SSH_CONFIG_FILE"
 
+    # Get current port
+    local current_port
+    current_port=$(get_current_ssh_port)
+    info "Current SSH port: $current_port"
+
     # Get new port
     local new_port
     while true; do
-        read -r -p "$(echo -e "${YELLOW}Enter SSH port [22]: ${NC}")" new_port
-        new_port=${new_port:-22}
+        read -r -p "$(echo -e "${YELLOW}Enter SSH port [$current_port]: ${NC}")" new_port
+        new_port=${new_port:-$current_port}
         if [[ "$new_port" =~ ^[0-9]+$ ]] && (( new_port >= 1 && new_port <= 65535 )); then
             break
         fi
@@ -426,17 +572,17 @@ configure_ssh() {
     # Disable password auth?
     local disable_password
     if confirm "Disable password authentication? (key-only login)" "N"; then
-        disable_password="yes"
-    else
         disable_password="no"
+    else
+        disable_password="yes"
     fi
 
     # Disable root login?
     local disable_root
     if confirm "Disable root login?" "Y"; then
-        disable_root="yes"
-    else
         disable_root="no"
+    else
+        disable_root="yes"
     fi
 
     # Apply changes
@@ -465,7 +611,7 @@ configure_ssh() {
         return 1
     fi
 
-    SSH_PORT=$new_port
+    CACHED_SSH_PORT="$new_port"
     restart_service ssh || return 1
 
     ok "SSH configured on port $new_port"
@@ -479,20 +625,27 @@ configure_firewall() {
 
     install_package ufw || return 1
 
-    # Reset to defaults
-    ufw --force reset 2>/dev/null
+    # Warning about reset
+    if confirm "WARNING: This will reset ALL existing UFW rules. Continue?" "N"; then
+        ufw --force reset 2>/dev/null
+        ok "UFW rules reset"
+    else
+        info "Skipping UFW reset"
+    fi
 
     # Default policies
     ufw default deny incoming
     ufw default allow outgoing
 
-    # Allow SSH port (current)
-    ufw allow "$SSH_PORT"/tcp comment "SSH"
-    ok "Allowed SSH port: $SSH_PORT"
+    # Allow SSH port (current from config)
+    local ssh_port
+    ssh_port=$(get_current_ssh_port)
+    ufw allow "$ssh_port"/tcp comment "SSH"
+    ok "Allowed SSH port: $ssh_port"
 
     # Allow additional ports
     for port in "${UFW_PORTS[@]}"; do
-        if [[ "$port" != "$SSH_PORT" ]]; then
+        if [[ "$port" != "$ssh_port" ]]; then
             ufw allow "$port"/tcp comment "Service"
             ok "Allowed port: $port"
         fi
@@ -516,9 +669,13 @@ install_fail2ban() {
 
     install_package fail2ban || return 1
 
+    # Get current SSH port for jail config
+    local ssh_port
+    ssh_port=$(get_current_ssh_port)
+
     # Create local jail config
     local jail_local="/etc/fail2ban/jail.local"
-    cat > "$jail_local" <<'EOF'
+    cat > "$jail_local" <<EOF
 [DEFAULT]
 bantime = 3600
 findtime = 600
@@ -527,7 +684,7 @@ backend = systemd
 
 [sshd]
 enabled = true
-port = ssh
+port = $ssh_port
 filter = sshd
 logpath = %(sshd_log)s
 maxretry = 3
@@ -535,7 +692,7 @@ EOF
 
     enable_service fail2ban
     restart_service fail2ban
-    ok "Fail2Ban installed and configured"
+    ok "Fail2Ban installed and configured (monitoring port $ssh_port)"
     return 0
 }
 
@@ -543,12 +700,13 @@ EOF
 create_swap() {
     if [[ -f "$SWAP_FILE" ]]; then
         warn "Swap file already exists: $SWAP_FILE"
-        local size=$(ls -lh "$SWAP_FILE" | awk '{print $5}')
+        local size
+        size=$(ls -lh "$SWAP_FILE" | awk '{print $5}')
         info "Current size: $size"
         if ! confirm "Recreate swap file?" "N"; then
             return 0
         fi
-        swapoff "$SWAP_FILE" 2>/dev/null
+        swapoff "$SWAP_FILE" 2>/dev/null || true
         rm -f "$SWAP_FILE"
     fi
 
@@ -561,24 +719,47 @@ create_swap() {
         err "Invalid size. Enter 1-64 GB"
     done
 
-    info "Creating ${size_gb}GB swap file..."
-    if fallocate -l "${size_gb}G" "$SWAP_FILE" 2>/dev/null || dd if=/dev/zero of="$SWAP_FILE" bs=1G count="$size_gb" 2>/dev/null; then
-        chmod 600 "$SWAP_FILE"
-        mkswap "$SWAP_FILE"
-        swapon "$SWAP_FILE"
-
-        # Add to fstab if not present
-        if ! grep -q "$SWAP_FILE" /etc/fstab; then
-            echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab
-        fi
-
-        ok "Swap created: ${size_gb}GB"
-        swapon --show
-        return 0
-    else
-        err "Failed to create swap file"
+    # Check disk space
+    local available_gb
+    available_gb=$(df -BG / | tail -1 | awk '{print $4}' | tr -d 'G')
+    if (( size_gb + 2 > available_gb )); then
+        err "Not enough disk space. Available: ${available_gb}GB, requested: ${size_gb}GB (+2GB buffer)"
         return 1
     fi
+
+    info "Creating ${size_gb}GB swap file..."
+    if fallocate -l "${size_gb}G" "$SWAP_FILE" 2>/dev/null; then
+        : # success
+    else
+        info "fallocate failed, using dd (slower)..."
+        if ! dd if=/dev/zero of="$SWAP_FILE" bs=1M count=$((size_gb * 1024)) status=progress 2>&1; then
+            err "Failed to create swap file with dd"
+            rm -f "$SWAP_FILE"
+            return 1
+        fi
+    fi
+
+    chmod 600 "$SWAP_FILE"
+    if ! mkswap "$SWAP_FILE" 2>/dev/null; then
+        err "mkswap failed"
+        rm -f "$SWAP_FILE"
+        return 1
+    fi
+
+    if ! swapon "$SWAP_FILE" 2>/dev/null; then
+        err "swapon failed"
+        rm -f "$SWAP_FILE"
+        return 1
+    fi
+
+    # Add to fstab if not present
+    if ! grep -q "^$SWAP_FILE " /etc/fstab; then
+        echo "$SWAP_FILE none swap sw 0 0" >> /etc/fstab
+    fi
+
+    ok "Swap created: ${size_gb}GB"
+    swapon --show
+    return 0
 }
 
 # 7. Enable BBR
@@ -590,7 +771,7 @@ enable_bbr() {
     fi
 
     # Check if already enabled
-    if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
+    if sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
         ok "BBR already enabled"
         return 0
     fi
@@ -601,11 +782,12 @@ net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 EOF
 
-    sysctl --system 2>/dev/null | tail -5 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done
+    if ! sysctl --system 2>/dev/null; then
+        err "sysctl --system failed"
+        return 1
+    fi
 
-    if sysctl net.ipv4.tcp_congestion_control | grep -q bbr; then
+    if sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
         ok "BBR enabled successfully"
         return 0
     else
@@ -646,14 +828,16 @@ net.ipv6.conf.default.disable_ipv6 = 1
 net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
 
-    sysctl --system 2>/dev/null | tail -3 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done
+    if ! sysctl --system 2>/dev/null; then
+        warn "sysctl --system returned non-zero"
+    fi
 
     # Update UFW to disable IPv6
-    sed -i 's/IPV6=yes/IPV6=no/' /etc/default/ufw 2>/dev/null
-    if service_active ufw; then
-        restart_service ufw
+    if [[ -f /etc/default/ufw ]]; then
+        sed -i 's/IPV6=yes/IPV6=no/' /etc/default/ufw 2>/dev/null
+        if service_active ufw; then
+            restart_service ufw || true
+        fi
     fi
 
     ok "IPv6 disabled (requires reboot for full effect)"
@@ -662,14 +846,16 @@ EOF
 enable_ipv6() {
     info "Enabling IPv6..."
     rm -f /etc/sysctl.d/99-disable-ipv6.conf
-    sysctl --system 2>/dev/null | tail -3 | while IFS= read -r line; do
-        [[ -n "$line" ]] && info "$line"
-    done
+    if ! sysctl --system 2>/dev/null; then
+        warn "sysctl --system returned non-zero"
+    fi
 
     # Update UFW to enable IPv6
-    sed -i 's/IPV6=no/IPV6=yes/' /etc/default/ufw 2>/dev/null
-    if service_active ufw; then
-        restart_service ufw
+    if [[ -f /etc/default/ufw ]]; then
+        sed -i 's/IPV6=no/IPV6=yes/' /etc/default/ufw 2>/dev/null
+        if service_active ufw; then
+            restart_service ufw || true
+        fi
     fi
 
     ok "IPv6 enabled (requires reboot for full effect)"
@@ -677,14 +863,15 @@ enable_ipv6() {
 
 check_ipv6_status() {
     info "IPv6 Status:"
-    local disabled=$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null)
+    local disabled
+    disabled=$(sysctl -n net.ipv6.conf.all.disable_ipv6 2>/dev/null)
     if [[ "$disabled" == "1" ]]; then
         echo -e "  ${RED}IPv6: DISABLED${NC} (via sysctl)"
     else
         echo -e "  ${GREEN}IPv6: ENABLED${NC} (via sysctl)"
     fi
 
-    local ipv6_addr=$(get_public_ipv6)
+    local ipv6_addr="$CACHED_PUBLIC_IPV6"
     if [[ -n "$ipv6_addr" ]]; then
         echo -e "  ${GREEN}Public IPv6:${NC} $ipv6_addr"
     else
@@ -704,14 +891,19 @@ server_info() {
     echo -e "${BOLD}════════════════════════════ SERVER INFORMATION ════════════════════════════${NC}"
 
     # OS Info
-    source /etc/os-release
-    echo -e "${CYAN}OS:${NC} $PRETTY_NAME"
+    local os_info="Unknown"
+    if [[ -f /etc/os-release ]]; then
+        # shellcheck source=/dev/null
+        source /etc/os-release
+        os_info="$PRETTY_NAME"
+    fi
+    echo -e "${CYAN}OS:${NC} $os_info"
     echo -e "${CYAN}Kernel:${NC} $(uname -r)"
     echo -e "${CYAN}Architecture:${NC} $(uname -m)"
 
     # CPU
     echo -e "\n${CYAN}CPU:${NC}"
-    lscpu | grep -E 'Model name|CPU\(s\):|Thread|Core|MHz' | sed 's/^/  /'
+    lscpu 2>/dev/null | grep -E 'Model name|CPU\(s\):|Thread|Core|MHz' | sed 's/^/  /'
 
     # Memory
     echo -e "\n${CYAN}Memory:${NC}"
@@ -725,11 +917,10 @@ server_info() {
 
     # Network
     echo -e "\n${CYAN}Network:${NC}"
-    echo -e "  Public IPv4: $(get_public_ip)"
-    local ipv6=$(get_public_ipv6)
-    [[ -n "$ipv6" ]] && echo -e "  Public IPv6: $ipv6"
+    echo -e "  Public IPv4: ${CACHED_PUBLIC_IP:-Not detected}"
+    [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "  Public IPv6: $CACHED_PUBLIC_IPV6"
 
-    ip -4 addr show scope global | grep -E '^ [0-9]+:|inet ' | sed 's/^/  /'
+    ip -4 addr show scope global 2>/dev/null | grep -E '^ [0-9]+:|inet ' | sed 's/^/  /'
 
     # Virtualization
     echo -e "\n${CYAN}Virtualization:${NC}"
@@ -780,7 +971,7 @@ network_test() {
 
     # IPv6
     echo -e "\n${BOLD}IPv6 Connectivity:${NC}"
-    if [[ -n $(get_public_ipv6) ]]; then
+    if [[ -n "$CACHED_PUBLIC_IPV6" ]]; then
         if ping -6 -c 2 -W 3 2001:4860:4860::8888 >/dev/null 2>&1; then
             ok "  Google IPv6 DNS: REACHABLE"
         else
@@ -792,41 +983,55 @@ network_test() {
 
     # HTTP/HTTPS
     echo -e "\n${BOLD}HTTP/HTTPS:${NC}"
-    if curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" https://google.com | grep -q "200"; then
+    local http_code
+    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" https://google.com 2>/dev/null)
+    if [[ "$http_code" == "200" ]]; then
         ok "  HTTPS (google.com): OK"
     else
-        err "  HTTPS (google.com): FAILED"
+        err "  HTTPS (google.com): FAILED (code: $http_code)"
     fi
 
-    if curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" http://httpbin.org/get | grep -q "200"; then
+    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" http://httpbin.org/get 2>/dev/null)
+    if [[ "$http_code" == "200" ]]; then
         ok "  HTTP (httpbin.org): OK"
     else
-        err "  HTTP (httpbin.org): FAILED"
+        err "  HTTP (httpbin.org): FAILED (code: $http_code)"
     fi
 }
 
 # 11. Speed Test
 speed_test() {
-    if ! command_exists speedtest-cli; then
+    if ! command_exists "$SPEEDTEST_CMD"; then
         info "Installing speedtest-cli..."
-        install_package speedtest-cli || {
-            # Try pip
+        if ! install_package speedtest-cli; then
+            warn "Package install failed. Trying pip3..."
             if command_exists pip3; then
-                pip3 install speedtest-cli 2>/dev/null || {
+                # On Ubuntu 24.04+, pip3 requires --break-system-packages
+                if ! pip3 install speedtest-cli 2>/dev/null && ! pip3 install --break-system-packages speedtest-cli 2>/dev/null; then
                     err "Failed to install speedtest-cli"
                     return 1
-                }
+                fi
             else
-                err "speedtest-cli not available"
+                err "speedtest-cli not available and pip3 not found"
                 return 1
             fi
-        }
+        fi
     fi
 
     info "Running speed test (this may take 30-60 seconds)..."
-    speedtest-cli --simple 2>&1 | while IFS= read -r line; do
-        [[ -n "$line" ]] && echo -e "  ${CYAN}$line${NC}"
-    done
+    local output
+    output=$($SPEEDTEST_CMD --simple 2>&1)
+    local rc=${PIPESTATUS[0]}
+
+    if [[ $rc -eq 0 ]]; then
+        echo "$output" | while IFS= read -r line; do
+            [[ -n "$line" ]] && echo -e "  ${CYAN}$line${NC}"
+        done
+    else
+        err "Speed test failed (code: $rc)"
+        echo "$output" >&2
+        return 1
+    fi
 }
 
 # 12. Domain Check
@@ -837,39 +1042,61 @@ domain_check() {
 
     info "Checking domain: $domain"
 
+    # Check dig availability
+    if ! command_exists dig; then
+        err "dig command not found. Install dnsutils first (option 2)."
+        return 1
+    fi
+
     # A records
     echo -e "\n${BOLD}A Records (IPv4):${NC}"
-    dig +short "$domain" A | while IFS= read -r ip; do
-        [[ -n "$ip" ]] && echo -e "  ${GREEN}$ip${NC}"
-    done
+    local a_records
+    a_records=$(dig +short "$domain" A 2>/dev/null)
+    if [[ -n "$a_records" ]]; then
+        echo "$a_records" | while IFS= read -r ip; do
+            [[ -n "$ip" ]] && echo -e "  ${GREEN}$ip${NC}"
+        done
+    else
+        warn "  No A records found"
+    fi
 
     # AAAA records
     echo -e "\n${BOLD}AAAA Records (IPv6):${NC}"
-    dig +short "$domain" AAAA | while IFS= read -r ip; do
-        [[ -n "$ip" ]] && echo -e "  ${GREEN}$ip${NC}"
-    done
+    local aaaa_records
+    aaaa_records=$(dig +short "$domain" AAAA 2>/dev/null)
+    if [[ -n "$aaaa_records" ]]; then
+        echo "$aaaa_records" | while IFS= read -r ip; do
+            [[ -n "$ip" ]] && echo -e "  ${GREEN}$ip${NC}"
+        done
+    else
+        warn "  No AAAA records found"
+    fi
 
     # Compare with server IP
-    local server_ip=$(get_public_ip)
-    echo -e "\n${BOLD}Server IP:${NC} $server_ip"
+    local server_ip="$CACHED_PUBLIC_IP"
+    echo -e "\n${BOLD}Server IP:${NC} ${server_ip:-Not detected}"
 
-    local match=false
-    while IFS= read -r ip; do
-        [[ "$ip" == "$server_ip" ]] && match=true
-    done < <(dig +short "$domain" A)
+    if [[ -n "$server_ip" && -n "$a_records" ]]; then
+        local match=false
+        while IFS= read -r ip; do
+            [[ "$ip" == "$server_ip" ]] && match=true
+        done <<< "$a_records"
 
-    if [[ "$match" == true ]]; then
-        ok "Domain A record matches server IP"
-    else
-        warn "Domain A record does NOT match server IP"
+        if [[ "$match" == true ]]; then
+            ok "Domain A record matches server IP"
+        else
+            warn "Domain A record does NOT match server IP"
+        fi
     fi
 
     # HTTPS check (basic)
     echo -e "\n${BOLD}HTTPS Check:${NC}"
-    if curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" "https://$domain" 2>/dev/null | grep -q "^2"; then
-        ok "HTTPS accessible"
+    local http_code
+    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" "https://$domain" 2>/dev/null)
+    if [[ "$http_code" == "200" ]]; then
+        ok "HTTPS accessible (200 OK)"
     else
-        warn "HTTPS not accessible or returns non-2xx"
+        warn "HTTPS not accessible or returns non-2xx (code: ${http_code:-N/A})"
     fi
 }
 
@@ -878,14 +1105,37 @@ install_3xui() {
     info "Installing 3x-ui panel..."
 
     if confirm "This will install 3x-ui from MHSanaei's repository. Continue?" "Y"; then
-        bash <(curl -Ls "$XUI_INSTALL_URL") 2>&1 | while IFS= read -r line; do
+        # Download installer to temp file first for error handling
+        local installer
+        installer=$(mktemp)
+        if ! curl -fsSL "$XUI_INSTALL_URL" -o "$installer"; then
+            err "Failed to download 3x-ui installer"
+            rm -f "$installer"
+            return 1
+        fi
+
+        if [[ ! -s "$installer" ]]; then
+            err "Downloaded installer is empty"
+            rm -f "$installer"
+            return 1
+        fi
+
+        bash "$installer" 2>&1 | while IFS= read -r line; do
             [[ -n "$line" ]] && info "$line"
         done
+        local rc=${PIPESTATUS[0]}
+        rm -f "$installer"
+
+        if [[ $rc -ne 0 ]]; then
+            err "3x-ui installation failed (code: $rc)"
+            return 1
+        fi
+
         ok "3x-ui installation completed"
 
         # Show default info
         echo -e "\n${BOLD}Default 3x-ui Info:${NC}"
-        echo -e "  ${CYAN}Panel URL:${NC} http://$(get_public_ip):2053/"
+        echo -e "  ${CYAN}Panel URL:${NC} http://${CACHED_PUBLIC_IP:-your-ip}:2053/"
         echo -e "  ${CYAN}Username:${NC} admin"
         echo -e "  ${CYAN}Password:${NC} admin"
         echo -e "  ${CYAN}Port:${NC} 2053 (default)"
@@ -941,7 +1191,7 @@ create_user() {
 
     # Add to sudo group?
     if confirm "Add user to sudo group?" "Y"; then
-        usermod -aG sudo "$username"
+        usermod -aG sudo "$username" || usermod -aG wheel "$username"
         ok "Added to sudo group"
     fi
 
@@ -974,7 +1224,12 @@ configure_sudo() {
     fi
 
     local sudoers_file="/etc/sudoers.d/90-$username-nopasswd"
-    echo "$username ALL=(ALL) NOPASSWD:ALL" > "$sudoers_file"
+
+    # Atomic creation with restricted umask
+    (
+        umask 077
+        echo "$username ALL=(ALL) NOPASSWD:ALL" > "$sudoers_file"
+    )
     chmod 440 "$sudoers_file"
 
     # Validate
@@ -1004,6 +1259,9 @@ main() {
     check_root || exit 1
     check_os || exit 1
     check_arch || exit 1
+
+    # Cache IPs once at startup
+    cache_ips
 
     # Main menu loop
     while true; do
