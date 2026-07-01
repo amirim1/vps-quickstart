@@ -245,7 +245,7 @@ I18N_EN["3xui_completed"]="3x-ui installation completed"
 I18N_EN["3xui_url"]="Panel URL"
 I18N_EN["3xui_username"]="Username"
 I18N_EN["3xui_password"]="Password"
-I18N_EN["3xui_port"]="Port (default)"
+I18N_EN["3xui_port"]="Port"
 I18N_EN["3xui_change_creds"]="CHANGE DEFAULT CREDENTIALS IMMEDIATELY AFTER FIRST LOGIN!"
 I18N_EN["3xui_cancelled"]="Installation cancelled"
 I18N_EN["enter_username"]="Enter username"
@@ -275,6 +275,11 @@ I18N_EN["yes"]="Yes"
 I18N_EN["no"]="No"
 I18N_EN["select_option"]="Select option"
 I18N_EN["interrupted_by_user"]="Interrupted by user. Cleaning up..."
+I18N_EN["back"]="Back to main menu"
+I18N_EN["dig_not_found"]="dig command not found. Install dnsutils first (option 2)."
+I18N_EN["pip3_not_found"]="speedtest-cli not available and pip3 not found"
+I18N_EN["default"]="default"
+I18N_EN["default_3xui_info"]="Default 3x-ui Info"
 I18N_EN["not_detected"]="Not detected"
 I18N_EN["cfg_firewall"]="Configure Firewall (UFW)"
 I18N_EN["allowed_port"]="Allowed port"
@@ -283,26 +288,6 @@ I18N_EN["kernel"]="Kernel"
 I18N_EN["arch"]="Architecture"
 I18N_EN["uptime"]="Uptime"
 I18N_EN["cpu"]="CPU"
-I18N_EN["memory"]="Memory"
-I18N_EN["disk_usage"]="Disk Usage"
-I18N_EN["network"]="Network"
-I18N_EN["virtualization"]="Virtualization"
-I18N_EN["load_average"]="Load Average"
-I18N_EN["unknown"]="Unknown"
-I18N_EN["public_ipv4"]="Public IPv4"
-I18N_EN["public_ipv6"]="Public IPv6"
-I18N_EN["testing_network"]="Testing network connectivity..."
-I18N_EN["ipv4_conn"]="IPv4 Connectivity"
-I18N_EN["reachable"]="REACHABLE"
-I18N_EN["unreachable"]="UNREACHABLE"
-I18N_EN["dns_resolution"]="DNS Resolution"
-I18N_EN["dns_ok"]="OK"
-I18N_EN["dns_fail"]="FAILED"
-I18N_EN["ipv6_conn"]="IPv6 Connectivity"
-I18N_EN["no_ipv6"]="No public IPv6 detected"
-I18N_EN["https_https"]="HTTP/HTTPS"
-I18N_EN["https_ok"]="OK"
-I18N_EN["http_fail"]="FAILED"
 
 # Russian translations
 I18N_RU["lang_name"]="Русский"
@@ -455,7 +440,7 @@ I18N_RU["3xui_completed"]="Установка 3x-ui завершена"
 I18N_RU["3xui_url"]="URL панели"
 I18N_RU["3xui_username"]="Имя пользователя"
 I18N_RU["3xui_password"]="Пароль"
-I18N_RU["3xui_port"]="Порт (по умолчанию)"
+I18N_RU["3xui_port"]="Порт"
 I18N_RU["3xui_change_creds"]="ИЗМЕНИТЕ СТАНДАРТНЫЕ ДАННЫЕ СРАЗУ ПОСЛЕ ПЕРВОГО ВХОДА!"
 I18N_RU["3xui_cancelled"]="Установка отменена"
 I18N_RU["enter_username"]="Введите имя пользователя"
@@ -502,17 +487,29 @@ I18N_RU["unknown"]="Неизвестно"
 I18N_RU["public_ipv4"]="Публичный IPv4"
 I18N_RU["public_ipv6"]="Публичный IPv6"
 I18N_RU["testing_network"]="Проверка сетевого соединения..."
+I18N_RU["ipv4_connectivity"]="IPv4 соединение"
 I18N_RU["ipv4_conn"]="IPv4 соединение"
 I18N_RU["reachable"]="ДОСТУПЕН"
 I18N_RU["unreachable"]="НЕДОСТУПЕН"
 I18N_RU["dns_resolution"]="DNS резолвинг"
 I18N_RU["dns_ok"]="ОК"
+I18N_RU["dns_failed"]="ОШИБКА"
 I18N_RU["dns_fail"]="ОШИБКА"
+I18N_RU["ipv6_connectivity"]="IPv6 соединение"
 I18N_RU["ipv6_conn"]="IPv6 соединение"
+I18N_RU["no_public_ipv6"]="Публичный IPv6 не обнаружен"
 I18N_RU["no_ipv6"]="Публичный IPv6 не обнаружен"
+I18N_RU["http_https"]="HTTP/HTTPS"
 I18N_RU["https_https"]="HTTP/HTTPS"
+I18N_RU["http_ok"]="ОК"
 I18N_RU["https_ok"]="ОК"
+I18N_RU["http_failed"]="ОШИБКА"
 I18N_RU["http_fail"]="ОШИБКА"
+I18N_RU["http_code"]="код"
+I18N_RU["dig_not_found"]="Команда dig не найдена. Установите dnsutils (пункт 2 меню)."
+I18N_RU["pip3_not_found"]="speedtest-cli недоступен и pip3 не найден"
+I18N_RU["default"]="по умолчанию"
+I18N_RU["default_3xui_info"]="Информация 3x-ui (по умолчанию)"
 I18N_RU["back"]="Назад в главное меню"
 
 # Translation function
@@ -1400,7 +1397,7 @@ server_info() {
 
 # 10. Network Connectivity Test
 network_test() {
-    info "Testing network connectivity..."
+    info "$(_ "testing_network")"
 
     local tests=(
         "8.8.8.8:Google DNS"
@@ -1409,76 +1406,72 @@ network_test() {
         "google.com:Google"
     )
 
-    echo -e "\n${BOLD}IPv4 Connectivity:${NC}"
+    echo -e "\n${BOLD}$(_ "ipv4_connectivity"):${NC}"
     for test in "${tests[@]}"; do
         IFS=':' read -r host desc <<< "$test"
         if ping -c 2 -W 3 "$host" >/dev/null 2>&1; then
-            ok "  $desc ($host): REACHABLE"
+            ok "  $desc ($host): $(_ "reachable")"
         else
-            err "  $desc ($host): UNREACHABLE"
+            err "  $desc ($host): $(_ "unreachable")"
         fi
     done
 
-    # DNS Resolution
-    echo -e "\n${BOLD}DNS Resolution:${NC}"
+    echo -e "\n${BOLD}$(_ "dns_resolution"):${NC}"
     for dns in "8.8.8.8" "1.1.1.1" "9.9.9.9"; do
         if dig @"$dns" google.com +short +time=3 >/dev/null 2>&1; then
-            ok "  DNS $dns: OK"
+            ok "  DNS $dns: $(_ "dns_ok")"
         else
-            err "  DNS $dns: FAILED"
+            err "  DNS $dns: $(_ "dns_failed")"
         fi
     done
 
-    # IPv6
-    echo -e "\n${BOLD}IPv6 Connectivity:${NC}"
+    echo -e "\n${BOLD}$(_ "ipv6_connectivity"):${NC}"
     if [[ -n "$CACHED_PUBLIC_IPV6" ]]; then
         if ping -6 -c 2 -W 3 2001:4860:4860::8888 >/dev/null 2>&1; then
-            ok "  Google IPv6 DNS: REACHABLE"
+            ok "  Google IPv6 DNS: $(_ "reachable")"
         else
-            warn "  Google IPv6 DNS: UNREACHABLE"
+            warn "  Google IPv6 DNS: $(_ "unreachable")"
         fi
     else
-        info "  No public IPv6 detected"
+        info "  $(_ "no_public_ipv6")"
     fi
 
-    # HTTP/HTTPS
-    echo -e "\n${BOLD}HTTP/HTTPS:${NC}"
+    echo -e "\n${BOLD}$(_ "http_https"):${NC}"
     local http_code
     http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" https://google.com 2>/dev/null)
     if [[ "$http_code" == "200" ]]; then
-        ok "  HTTPS (google.com): OK"
+        ok "  HTTPS (google.com): $(_ "http_ok")"
     else
-        err "  HTTPS (google.com): FAILED (code: $http_code)"
+        err "  HTTPS (google.com): $(_ "http_failed") ($(_ "http_code"): $http_code)"
     fi
 
     http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" http://httpbin.org/get 2>/dev/null)
     if [[ "$http_code" == "200" ]]; then
-        ok "  HTTP (httpbin.org): OK"
+        ok "  HTTP (httpbin.org): $(_ "http_ok")"
     else
-        err "  HTTP (httpbin.org): FAILED (code: $http_code)"
+        err "  HTTP (httpbin.org): $(_ "http_failed") ($(_ "http_code"): $http_code)"
     fi
 }
 
 # 11. Speed Test
 speed_test() {
     if ! command_exists "$SPEEDTEST_CMD"; then
-        info "Installing speedtest-cli..."
+        info "$(_ "installing_speedtest")"
         if ! install_package speedtest-cli; then
             warn "Package install failed. Trying pip3..."
             if command_exists pip3; then
-                # On Ubuntu 24.04+, pip3 requires --break-system-packages
                 if ! pip3 install speedtest-cli 2>/dev/null && ! pip3 install --break-system-packages speedtest-cli 2>/dev/null; then
-                    err "Failed to install speedtest-cli"
+                    err "$(_ "speedtest_failed_install")"
                     return 1
                 fi
             else
-                err "speedtest-cli not available and pip3 not found"
+                err "$(_ "pip3_not_found")"
                 return 1
             fi
         fi
     fi
 
-    info "Running speed test (this may take 30-60 seconds)..."
+    info "$(_ "running_speedtest")"
     local output
     output=$($SPEEDTEST_CMD --simple 2>&1)
     local rc=${PIPESTATUS[0]}
@@ -1488,7 +1481,7 @@ speed_test() {
             [[ -n "$line" ]] && echo -e "  ${CYAN}$line${NC}"
         done
     else
-        err "Speed test failed (code: $rc)"
+        err "$(_ "speedtest_failed") ($(_ "http_code"): $rc)"
         echo "$output" >&2
         return 1
     fi
@@ -1497,19 +1490,17 @@ speed_test() {
 # 12. Domain Check
 domain_check() {
     local domain
-    read -r -p "$(echo -e "${YELLOW}Enter domain to check: ${NC}")" domain
-    [[ -z "$domain" ]] && { err "Domain required"; return 1; }
+    read -r -p "$(echo -e "${YELLOW}$(_ "enter_domain"): ${NC}")" domain
+    [[ -z "$domain" ]] && { err "$(_ "domain_required")"; return 1; }
 
-    info "Checking domain: $domain"
+    info "$(_ "checking_domain"): $domain"
 
-    # Check dig availability
     if ! command_exists dig; then
-        err "dig command not found. Install dnsutils first (option 2)."
+        err "$(_ "dig_not_found")"
         return 1
     fi
 
-    # A records
-    echo -e "\n${BOLD}A Records (IPv4):${NC}"
+    echo -e "\n${BOLD}$(_ "a_records"):${NC}"
     local a_records
     a_records=$(dig +short "$domain" A 2>/dev/null)
     if [[ -n "$a_records" ]]; then
@@ -1517,11 +1508,10 @@ domain_check() {
             [[ -n "$ip" ]] && echo -e "  ${GREEN}$ip${NC}"
         done
     else
-        warn "  No A records found"
+        warn "  $(_ "no_a_records")"
     fi
 
-    # AAAA records
-    echo -e "\n${BOLD}AAAA Records (IPv6):${NC}"
+    echo -e "\n${BOLD}$(_ "aaaa_records"):${NC}"
     local aaaa_records
     aaaa_records=$(dig +short "$domain" AAAA 2>/dev/null)
     if [[ -n "$aaaa_records" ]]; then
@@ -1529,12 +1519,11 @@ domain_check() {
             [[ -n "$ip" ]] && echo -e "  ${GREEN}$ip${NC}"
         done
     else
-        warn "  No AAAA records found"
+        warn "  $(_ "no_aaaa_records")"
     fi
 
-    # Compare with server IP
     local server_ip="$CACHED_PUBLIC_IP"
-    echo -e "\n${BOLD}Server IP:${NC} ${server_ip:-Not detected}"
+    echo -e "\n${BOLD}$(_ "server_ip"):${NC} ${server_ip:-$(_ "not_detected")}"
 
     if [[ -n "$server_ip" && -n "$a_records" ]]; then
         local match=false
@@ -1543,39 +1532,37 @@ domain_check() {
         done <<< "$a_records"
 
         if [[ "$match" == true ]]; then
-            ok "Domain A record matches server IP"
+            ok "$(_ "domain_matches")"
         else
-            warn "Domain A record does NOT match server IP"
+            warn "$(_ "domain_not_match")"
         fi
     fi
 
-    # HTTPS check (basic)
-    echo -e "\n${BOLD}HTTPS Check:${NC}"
+    echo -e "\n${BOLD}$(_ "https_check"):${NC}"
     local http_code
     http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" "https://$domain" 2>/dev/null)
     if [[ "$http_code" == "200" ]]; then
-        ok "HTTPS accessible (200 OK)"
+        ok "$(_ "https_accessible")"
     else
-        warn "HTTPS not accessible or returns non-2xx (code: ${http_code:-N/A})"
+        warn "$(_ "https_not_accessible") ($(_ "http_code"): ${http_code:-N/A})"
     fi
 }
 
 # 13. Install 3x-ui
 install_3xui() {
-    info "Installing 3x-ui panel..."
+    info "$(_ "installing_3xui")"
 
-    if confirm "This will install 3x-ui from MHSanaei's repository. Continue?" "Y"; then
-        # Download installer to temp file first for error handling
+    if confirm "$(_ "3xui_confirm")" "Y"; then
         local installer
         installer=$(mktemp)
         if ! curl -fsSL "$XUI_INSTALL_URL" -o "$installer"; then
-            err "Failed to download 3x-ui installer"
+            err "$(_ "3xui_download_failed")"
             rm -f "$installer"
             return 1
         fi
 
         if [[ ! -s "$installer" ]]; then
-            err "Downloaded installer is empty"
+            err "$(_ "3xui_empty")"
             rm -f "$installer"
             return 1
         fi
@@ -1587,21 +1574,20 @@ install_3xui() {
         rm -f "$installer"
 
         if [[ $rc -ne 0 ]]; then
-            err "3x-ui installation failed (code: $rc)"
+            err "$(_ "3xui_install_failed") ($(_ "http_code"): $rc)"
             return 1
         fi
 
-        ok "3x-ui installation completed"
+        ok "$(_ "3xui_completed")"
 
-        # Show default info
-        echo -e "\n${BOLD}Default 3x-ui Info:${NC}"
-        echo -e "  ${CYAN}Panel URL:${NC} http://${CACHED_PUBLIC_IP:-your-ip}:2053/"
-        echo -e "  ${CYAN}Username:${NC} admin"
-        echo -e "  ${CYAN}Password:${NC} admin"
-        echo -e "  ${CYAN}Port:${NC} 2053 (default)"
-        warn "CHANGE DEFAULT CREDENTIALS IMMEDIATELY AFTER FIRST LOGIN!"
+        echo -e "\n${BOLD}$(_ "default_3xui_info"):${NC}"
+        echo -e "  ${CYAN}$(_ "3xui_url"):${NC} http://${CACHED_PUBLIC_IP:-your-ip}:2053/"
+        echo -e "  ${CYAN}$(_ "3xui_username"):${NC} admin"
+        echo -e "  ${CYAN}$(_ "3xui_password"):${NC} admin"
+        echo -e "  ${CYAN}$(_ "3xui_port"):${NC} 2053 ($(_ "default"))"
+        warn "$(_ "3xui_change_creds")"
     else
-        info "Installation cancelled"
+        info "$(_ "3xui_cancelled")"
     fi
 }
 
@@ -1609,56 +1595,53 @@ install_3xui() {
 create_user() {
     local username
     while true; do
-        read -r -p "$(echo -e "${YELLOW}Enter username: ${NC}")" username
+        read -r -p "$(echo -e "${YELLOW}$(_ "enter_username"): ${NC}")" username
         if [[ -z "$username" ]]; then
-            err "Username cannot be empty"
+            err "$(_ "username_empty")"
             continue
         fi
         if [[ "$username" =~ ^[a-z_][a-z0-9_-]*$ ]]; then
             break
         fi
-        err "Invalid username. Use lowercase, numbers, underscore, hyphen. Start with letter/underscore."
+        err "$(_ "invalid_username")"
     done
 
     if id "$username" &>/dev/null; then
-        err "User already exists: $username"
+        err "$(_ "user_exists"): $username"
         return 1
     fi
 
     local password
     while true; do
-        read -s -r -p "$(echo -e "${YELLOW}Enter password: ${NC}")" password
+        read -s -r -p "$(echo -e "${YELLOW}$(_ "enter_password"): ${NC}")" password
         echo
         if [[ ${#password} -ge 8 ]]; then
             break
         fi
-        err "Password must be at least 8 characters"
+        err "$(_ "password_too_short")"
     done
 
     local confirm_pass
-    read -s -r -p "$(echo -e "${YELLOW}Confirm password: ${NC}")" confirm_pass
+    read -s -r -p "$(echo -e "${YELLOW}$(_ "confirm_password"): ${NC}")" confirm_pass
     echo
-    [[ "$password" != "$confirm_pass" ]] && { err "Passwords do not match"; return 1; }
+    [[ "$password" != "$confirm_pass" ]] && { err "$(_ "passwords_not_match")"; return 1; }
 
-    # Create user
     if useradd -m -s /bin/bash "$username" 2>/dev/null; then
         echo "$username:$password" | chpasswd
-        ok "User created: $username"
+        ok "$(_ "user_created"): $username"
     else
-        err "Failed to create user"
+        err "$(_ "failed_create_user")"
         return 1
     fi
 
-    # Add to sudo group?
-    if confirm "Add user to sudo group?" "Y"; then
+    if confirm "$(_ "add_to_sudo")" "Y"; then
         usermod -aG sudo "$username" || usermod -aG wheel "$username"
-        ok "Added to sudo group"
+        ok "$(_ "added_to_sudo")"
     fi
 
-    # Setup SSH key?
-    if confirm "Setup SSH key for this user?" "N"; then
+    if confirm "$(_ "setup_ssh_key")" "N"; then
         local ssh_key
-        read -r -p "$(echo -e "${YELLOW}Paste public SSH key: ${NC}")" ssh_key
+        read -r -p "$(echo -e "${YELLOW}$(_ "paste_ssh_key"): ${NC}")" ssh_key
         if [[ -n "$ssh_key" ]]; then
             local ssh_dir="/home/$username/.ssh"
             mkdir -p "$ssh_dir"
@@ -1666,7 +1649,7 @@ create_user() {
             chmod 700 "$ssh_dir"
             chmod 600 "$ssh_dir/authorized_keys"
             chown -R "$username:$username" "$ssh_dir"
-            ok "SSH key configured"
+            ok "$(_ "ssh_key_configured")"
         fi
     fi
 
@@ -1676,28 +1659,26 @@ create_user() {
 # 15. Configure Sudo Passwordless
 configure_sudo() {
     local username
-    read -r -p "$(echo -e "${YELLOW}Enter username for passwordless sudo: ${NC}")" username
+    read -r -p "$(echo -e "${YELLOW}$(_ "enter_username_sudo"): ${NC}")" username
 
     if ! id "$username" &>/dev/null; then
-        err "User not found: $username"
+        err "$(_ "user_not_found"): $username"
         return 1
     fi
 
     local sudoers_file="/etc/sudoers.d/90-$username-nopasswd"
 
-    # Atomic creation with restricted umask
     (
         umask 077
         echo "$username ALL=(ALL) NOPASSWD:ALL" > "$sudoers_file"
     )
     chmod 440 "$sudoers_file"
 
-    # Validate
     if visudo -cf "$sudoers_file" 2>/dev/null; then
-        ok "Passwordless sudo configured for: $username"
+        ok "$(_ "sudo_configured"): $username"
         return 0
     else
-        err "Invalid sudoers syntax, removing file"
+        err "$(_ "sudo_invalid")"
         rm -f "$sudoers_file"
         return 1
     fi
