@@ -88,6 +88,768 @@ readonly BOLD='\033[1m'
 readonly NC='\033[0m' # No Color
 
 # =============================================================================
+# INTERNATIONALIZATION (i18n)
+# =============================================================================
+declare -A I18N_EN
+declare -A I18N_RU
+CURRENT_LANG="en"
+
+# English translations
+I18N_EN[
+"lang_name"]="English"
+I18N_EN[
+"select_language"]="Select language / Выберите язык:"
+I18N_EN[
+"lang_en"]="1) English"
+I18N_EN[
+"lang_ru"]="2) Русский"
+I18N_EN[
+"invalid_option"]="Invalid option"
+I18N_EN[
+"must_run_as_root"]="This script must be run as root"
+I18N_EN[
+"os_detected"]="OS detected"
+I18N_EN[
+"unsupported_os"]="Unsupported OS"
+I18N_EN[
+"required"]="required"
+I18N_EN[
+"architecture"]="Architecture"
+I18N_EN[
+"unsupported_arch"]="Unsupported architecture"
+I18N_EN[
+"kernel_too_old"]="Kernel too old. BBR requires kernel >="
+I18N_EN[
+"apt_lock_timeout"]="apt lock timeout after"
+I18N_EN[
+"waiting_apt"]="Waiting for apt lock..."
+I18N_EN[
+"update_failed"]="apt-get update failed"
+I18N_EN[
+"package_list_updated"]="Package list updated"
+I18N_EN[
+"package_already_installed"]="Package already installed"
+I18N_EN[
+"installing"]="Installing"
+I18N_EN[
+"installed"]="Installed"
+I18N_EN[
+"failed_to_install"]="Failed to install"
+I18N_EN[
+"backed_up"]="Backed up"
+I18N_EN[
+"restored"]="Restored"
+I18N_EN[
+"no_backup_found"]="No backup found for"
+I18N_EN[
+"ssh_test_passed"]="SSH configuration test passed"
+I18N_EN[
+"ssh_test_failed"]="SSH configuration test failed"
+I18N_EN[
+"restarting_service"]="Restarting service"
+I18N_EN[
+"service_restarted"]="Service restarted"
+I18N_EN[
+"failed_to_restart"]="Failed to restart"
+I18N_EN[
+"service_enabled"]="Service enabled"
+I18N_EN[
+"failed_to_enable"]="Failed to enable"
+I18N_EN[
+"press_any_key"]="Press any key to continue..."
+I18N_EN[
+"menu_title"]="MENU"
+I18N_EN[
+"update_system"]="Update System"
+I18N_EN[
+"install_base_packages"]="Install Base Packages"
+I18N_EN[
+"configure_ssh"]="Configure SSH"
+I18N_EN[
+"configure_firewall"]="Configure Firewall (UFW)"
+I18N_EN[
+"install_fail2ban"]="Install Fail2Ban"
+I18N_EN[
+"create_swap"]="Create Swap File"
+I18N_EN[
+"enable_bbr"]="Enable BBR"
+I18N_EN[
+"manage_ipv6"]="Manage IPv6"
+I18N_EN[
+"server_info"]="Server Information"
+I18N_EN[
+"network_test"]="Network Connectivity Test"
+I18N_EN[
+"speed_test"]="Speed Test"
+I18N_EN[
+"domain_check"]="Domain Check"
+I18N_EN[
+"install_3xui"]="Install 3x-ui Panel"
+I18N_EN[
+"create_user"]="Create User"
+I18N_EN[
+"configure_sudo"]="Configure Sudo (Passwordless)"
+I18N_EN[
+"exit"]="Exit"
+I18N_EN[
+"updating_package_list"]="Updating package list..."
+I18N_EN[
+"upgrading_packages"]="Upgrading packages..."
+I18N_EN[
+"packages_upgraded"]="Packages upgraded"
+I18N_EN[
+"upgrade_failed"]="Upgrade failed"
+I18N_EN[
+"removing_unused"]="Removing unused packages..."
+I18N_EN[
+"autoremove_failed"]="autoremove returned code"
+I18N_EN[
+"autoclean_failed"]="autoclean returned code"
+I18N_EN[
+"cleanup_complete"]="Cleanup complete"
+I18N_EN[
+"installing_base"]="Installing base packages"
+I18N_EN[
+"all_base_installed"]="All base packages processed"
+I18N_EN[
+"configuring_ssh"]="Configuring SSH..."
+I18N_EN[
+"current_ssh_port"]="Current SSH port"
+I18N_EN[
+"enter_ssh_port"]="Enter SSH port"
+I18N_EN[
+"invalid_port"]="Invalid port. Must be 1-65535"
+I18N_EN[
+"disable_password_auth"]="Disable password authentication? (key-only login)"
+I18N_EN[
+"disable_root_login"]="Disable root login?"
+I18N_EN[
+"applying_ssh"]="Applying SSH configuration..."
+I18N_EN[
+"ssh_config_failed"]="SSH config test failed. Restoring backup..."
+I18N_EN[
+"ssh_configured"]="SSH configured on port"
+I18N_EN[
+"ssh_warning"]="IMPORTANT: Ensure you have SSH key access before disconnecting!"
+I18N_EN[
+"configuring_ufw"]="Configuring UFW firewall..."
+I18N_EN[
+"ufw_reset_warning"]="WARNING: This will reset ALL existing UFW rules. Continue?"
+I18N_EN[
+"ufw_rules_reset"]="UFW rules reset"
+I18N_EN[
+"ufw_skipping_reset"]="Skipping UFW reset"
+I18N_EN[
+"ufw_enabled"]="UFW enabled"
+I18N_EN[
+"ufw_not_enabled"]="UFW configured but not enabled"
+I18N_EN[
+"installing_fail2ban"]="Installing Fail2Ban..."
+I18N_EN[
+"fail2ban_configured"]="Fail2Ban installed and configured (monitoring port"
+I18N_EN[
+"swap_exists"]="Swap file already exists"
+I18N_EN[
+"current_size"]="Current size"
+I18N_EN[
+"recreate_swap"]="Recreate swap file?"
+I18N_EN[
+"enter_swap_size"]="Enter swap size in GB (e.g., 2, 4)"
+I18N_EN[
+"invalid_swap_size"]="Invalid size. Enter 1-64 GB"
+I18N_EN[
+"not_enough_space"]="Not enough disk space. Available"
+I18N_EN[
+"requested"]="requested"
+I18N_EN[
+"creating_swap"]="Creating swap file..."
+I18N_EN[
+"fallocate_failed"]="fallocate failed, using dd (slower)..."
+I18N_EN[
+"dd_failed"]="Failed to create swap file with dd"
+I18N_EN[
+"mkswap_failed"]="mkswap failed"
+I18N_EN[
+"swapon_failed"]="swapon failed"
+I18N_EN[
+"swap_created"]="Swap created"
+I18N_EN[
+"enabling_bbr"]="Enabling BBR congestion control..."
+I18N_EN[
+"bbr_already_enabled"]="BBR already enabled"
+I18N_EN[
+"bbr_enabled"]="BBR enabled successfully"
+I18N_EN[
+"bbr_failed"]="Failed to enable BBR"
+I18N_EN[
+"disabling_ipv6"]="Disabling IPv6..."
+I18N_EN[
+"enabling_ipv6"]="Enabling IPv6..."
+I18N_EN[
+"ipv6_disabled"]="IPv6 disabled (requires reboot for full effect)"
+I18N_EN[
+"ipv6_enabled"]="IPv6 enabled (requires reboot for full effect)"
+I18N_EN[
+"ipv6_status"]="IPv6 Status:"
+I18N_EN[
+"ipv6_disabled_sysctl"]="IPv6: DISABLED (via sysctl)"
+I18N_EN[
+"ipv6_enabled_sysctl"]="IPv6: ENABLED (via sysctl)"
+I18N_EN[
+"public_ipv6"]="Public IPv6"
+I18N_EN[
+"not_detected"]="Not detected"
+I18N_EN[
+"interfaces_with_ipv6"]="Interfaces with IPv6"
+I18N_EN[
+"server_information"]="SERVER INFORMATION"
+I18N_EN[
+"memory"]="Memory"
+I18N_EN[
+"disk_usage"]="Disk Usage"
+I18N_EN[
+"network"]="Network"
+I18N_EN[
+"public_ipv4"]="Public IPv4"
+I18N_EN[
+"virtualization"]="Virtualization"
+I18N_EN[
+"unknown"]="Unknown"
+I18N_EN[
+"load_average"]="Load Average"
+I18N_EN[
+"testing_network"]="Testing network connectivity..."
+I18N_EN[
+"ipv4_connectivity"]="IPv4 Connectivity"
+I18N_EN[
+"reachable"]="REACHABLE"
+I18N_EN[
+"unreachable"]="UNREACHABLE"
+I18N_EN[
+"dns_resolution"]="DNS Resolution"
+I18N_EN[
+"dns_ok"]="OK"
+I18N_EN[
+"dns_failed"]="FAILED"
+I18N_EN[
+"ipv6_connectivity"]="IPv6 Connectivity"
+I18N_EN[
+"no_public_ipv6"]="No public IPv6 detected"
+I18N_EN[
+"http_https"]="HTTP/HTTPS"
+I18N_EN[
+"http_ok"]="OK"
+I18N_EN[
+"http_failed"]="FAILED"
+I18N_EN[
+"http_code"]="code"
+I18N_EN[
+"installing_speedtest"]="Installing speedtest-cli..."
+I18N_EN[
+"speedtest_failed_install"]="Failed to install speedtest-cli"
+I18N_EN[
+"running_speedtest"]="Running speed test (this may take 30-60 seconds)..."
+I18N_EN[
+"speedtest_failed"]="Speed test failed"
+I18N_EN[
+"enter_domain"]="Enter domain to check"
+I18N_EN[
+"domain_required"]="Domain required"
+I18N_EN[
+"checking_domain"]="Checking domain"
+I18N_EN[
+"a_records"]="A Records (IPv4)"
+I18N_EN[
+"no_a_records"]="No A records found"
+I18N_EN[
+"aaaa_records"]="AAAA Records (IPv6)"
+I18N_EN[
+"no_aaaa_records"]="No AAAA records found"
+I18N_EN[
+"server_ip"]="Server IP"
+I18N_EN[
+"domain_matches"]="Domain A record matches server IP"
+I18N_EN[
+"domain_not_match"]="Domain A record does NOT match server IP"
+I18N_EN[
+"https_check"]="HTTPS Check"
+I18N_EN[
+"https_accessible"]="HTTPS accessible"
+I18N_EN[
+"https_not_accessible"]="HTTPS not accessible or returns non-2xx"
+I18N_EN[
+"installing_3xui"]="Installing 3x-ui panel..."
+I18N_EN[
+"3xui_confirm"]="This will install 3x-ui from MHSanaei's repository. Continue?"
+I18N_EN[
+"3xui_download_failed"]="Failed to download 3x-ui installer"
+I18N_EN[
+"3xui_empty"]="Downloaded installer is empty"
+I18N_EN[
+"3xui_install_failed"]="3x-ui installation failed"
+I18N_EN[
+"3xui_completed"]="3x-ui installation completed"
+I18N_EN[
+"3xui_url"]="Panel URL"
+I18N_EN[
+"3xui_username"]="Username"
+I18N_EN[
+"3xui_password"]="Password"
+I18N_EN[
+"3xui_port"]="Port (default)"
+I18N_EN[
+"3xui_change_creds"]="CHANGE DEFAULT CREDENTIALS IMMEDIATELY AFTER FIRST LOGIN!"
+I18N_EN[
+"3xui_cancelled"]="Installation cancelled"
+I18N_EN[
+"enter_username"]="Enter username"
+I18N_EN[
+"username_empty"]="Username cannot be empty"
+I18N_EN[
+"invalid_username"]="Invalid username. Use lowercase, numbers, underscore, hyphen. Start with letter/underscore."
+I18N_EN[
+"user_exists"]="User already exists"
+I18N_EN[
+"enter_password"]="Enter password"
+I18N_EN[
+"password_too_short"]="Password must be at least 8 characters"
+I18N_EN[
+"confirm_password"]="Confirm password"
+I18N_EN[
+"passwords_not_match"]="Passwords do not match"
+I18N_EN[
+"user_created"]="User created"
+I18N_EN[
+"failed_create_user"]="Failed to create user"
+I18N_EN[
+"add_to_sudo"]="Add user to sudo group?"
+I18N_EN[
+"added_to_sudo"]="Added to sudo group"
+I18N_EN[
+"setup_ssh_key"]="Setup SSH key for this user?"
+I18N_EN[
+"paste_ssh_key"]="Paste public SSH key"
+I18N_EN[
+"ssh_key_configured"]="SSH key configured"
+I18N_EN[
+"enter_username_sudo"]="Enter username for passwordless sudo"
+I18N_EN[
+"user_not_found"]="User not found"
+I18N_EN[
+"sudo_configured"]="Passwordless sudo configured for"
+I18N_EN[
+"sudo_invalid"]="Invalid sudoers syntax, removing file"
+I18N_EN[
+"exiting"]="Exiting"
+I18N_EN[
+"internet_required"]="Internet connection required for this feature"
+I18N_EN[
+"cancelled"]="Cancelled"
+I18N_EN[
+"continue"]="Continue?"
+I18N_EN[
+"yes"]="Yes"
+I18N_EN[
+"no"]="No"
+I18N_EN[
+"back"]="Back to Main Menu"
+
+# Russian translations
+I18N_RU[
+"lang_name"]="Русский"
+I18N_RU[
+"select_language"]="Select language / Выберите язык:"
+I18N_RU[
+"lang_en"]="1) English"
+I18N_RU[
+"lang_ru"]="2) Русский"
+I18N_RU[
+"invalid_option"]="Неверный вариант"
+I18N_RU[
+"must_run_as_root"]="Этот скрипт должен быть запущен от root"
+I18N_RU[
+"os_detected"]="Обнаружена ОС"
+I18N_RU[
+"unsupported_os"]="Неподдерживаемая ОС"
+I18N_RU[
+"required"]="требуется"
+I18N_RU[
+"architecture"]="Архитектура"
+I18N_RU[
+"unsupported_arch"]="Неподдерживаемая архитектура"
+I18N_RU[
+"kernel_too_old"]="Слишком старое ядро. BBR требует ядро >="
+I18N_RU[
+"apt_lock_timeout"]="Таймаут блокировки apt после"
+I18N_RU[
+"waiting_apt"]="Ожидание блокировки apt..."
+I18N_RU[
+"update_failed"]="apt-get update завершился с ошибкой"
+I18N_RU[
+"package_list_updated"]="Список пакетов обновлен"
+I18N_RU[
+"package_already_installed"]="Пакет уже установлен"
+I18N_RU[
+"installing"]="Установка"
+I18N_RU[
+"installed"]="Установлен"
+I18N_RU[
+"failed_to_install"]="Не удалось установить"
+I18N_RU[
+"backed_up"]="Резервная копия создана"
+I18N_RU[
+"restored"]="Восстановлено"
+I18N_RU[
+"no_backup_found"]="Резервная копия не найдена для"
+I18N_RU[
+"ssh_test_passed"]="Тест конфигурации SSH пройден"
+I18N_RU[
+"ssh_test_failed"]="Тест конфигурации SSH не пройден"
+I18N_RU[
+"restarting_service"]="Перезапуск службы"
+I18N_RU[
+"service_restarted"]="Служба перезапущена"
+I18N_RU[
+"failed_to_restart"]="Не удалось перезапустить"
+I18N_RU[
+"service_enabled"]="Служба включена"
+I18N_RU[
+"failed_to_enable"]="Не удалось включить"
+I18N_RU[
+"press_any_key"]="Нажмите любую клавишу для продолжения..."
+I18N_RU[
+"menu_title"]="МЕНЮ"
+I18N_RU[
+"update_system"]="Обновление системы"
+I18N_RU[
+"install_base_packages"]="Установка базовых пакетов"
+I18N_RU[
+"configure_ssh"]="Настройка SSH"
+I18N_RU[
+"configure_firewall"]="Настройка Firewall (UFW)"
+I18N_RU[
+"install_fail2ban"]="Установка Fail2Ban"
+I18N_RU[
+"create_swap"]="Создание Swap"
+I18N_RU[
+"enable_bbr"]="Включение BBR"
+I18N_RU[
+"manage_ipv6"]="Управление IPv6"
+I18N_RU[
+"server_info"]="Информация о сервере"
+I18N_RU[
+"network_test"]="Проверка сети"
+I18N_RU[
+"speed_test"]="Проверка скорости"
+I18N_RU[
+"domain_check"]="Проверка домена"
+I18N_RU[
+"install_3xui"]="Установка 3x-ui"
+I18N_RU[
+"create_user"]="Создание пользователя"
+I18N_RU[
+"configure_sudo"]="Настройка Sudo (без пароля)"
+I18N_RU[
+"exit"]="Выход"
+I18N_RU[
+"updating_package_list"]="Обновление списка пакетов..."
+I18N_RU[
+"upgrading_packages"]="Обновление пакетов..."
+I18N_RU[
+"packages_upgraded"]="Пакеты обновлены"
+I18N_RU[
+"upgrade_failed"]="Обновление не удалось"
+I18N_RU[
+"removing_unused"]="Удаление неиспользуемых пакетов..."
+I18N_RU[
+"autoremove_failed"]="autoremove завершился с кодом"
+I18N_RU[
+"autoclean_failed"]="autoclean завершился с кодом"
+I18N_RU[
+"cleanup_complete"]="Очистка завершена"
+I18N_RU[
+"installing_base"]="Установка базовых пакетов"
+I18N_RU[
+"all_base_installed"]="Все базовые пакеты обработаны"
+I18N_RU[
+"configuring_ssh"]="Настройка SSH..."
+I18N_RU[
+"current_ssh_port"]="Текущий порт SSH"
+I18N_RU[
+"enter_ssh_port"]="Введите порт SSH"
+I18N_RU[
+"invalid_port"]="Неверный порт. Должен быть 1-65535"
+I18N_RU[
+"disable_password_auth"]="Отключить аутентификацию по паролю? (только ключи)"
+I18N_RU[
+"disable_root_login"]="Отключить вход под root?"
+I18N_RU[
+"applying_ssh"]="Применение конфигурации SSH..."
+I18N_RU[
+"ssh_config_failed"]="Тест конфигурации SSH не пройден. Восстановление из резервной копии..."
+I18N_RU[
+"ssh_configured"]="SSH настроен на порту"
+I18N_RU[
+"ssh_warning"]="ВАЖНО: Убедитесь, что у вас есть SSH-ключ перед отключением!"
+I18N_RU[
+"configuring_ufw"]="Настройка фаервола UFW..."
+I18N_RU[
+"ufw_reset_warning"]="ВНИМАНИЕ: Это сбросит ВСЕ существующие правила UFW. Продолжить?"
+I18N_RU[
+"ufw_rules_reset"]="Правила UFW сброшены"
+I18N_RU[
+"ufw_skipping_reset"]="Пропуск сброса UFW"
+I18N_RU[
+"ufw_enabled"]="UFW включен"
+I18N_RU[
+"ufw_not_enabled"]="UFW настроен, но не включен"
+I18N_RU[
+"installing_fail2ban"]="Установка Fail2Ban..."
+I18N_RU[
+"fail2ban_configured"]="Fail2Ban установлен и настроен (мониторинг порта"
+I18N_RU[
+"swap_exists"]="Файл подкачки уже существует"
+I18N_RU[
+"current_size"]="Текущий размер"
+I18N_RU[
+"recreate_swap"]="Пересоздать файл подкачки?"
+I18N_RU[
+"enter_swap_size"]="Введите размер swap в ГБ (например, 2, 4)"
+I18N_RU[
+"invalid_swap_size"]="Неверный размер. Введите 1-64 ГБ"
+I18N_RU[
+"not_enough_space"]="Недостаточно места на диске. Доступно"
+I18N_RU[
+"requested"]="запрошено"
+I18N_RU[
+"creating_swap"]="Создание файла подкачки..."
+I18N_RU[
+"fallocate_failed"]="fallocate не удался, используем dd (медленнее)..."
+I18N_RU[
+"dd_failed"]="Не удалось создать swap с помощью dd"
+I18N_RU[
+"mkswap_failed"]="mkswap не удался"
+I18N_RU[
+"swapon_failed"]="swapon не удался"
+I18N_RU[
+"swap_created"]="Swap создан"
+I18N_RU[
+"enabling_bbr"]="Включение BBR congestion control..."
+I18N_RU[
+"bbr_already_enabled"]="BBR уже включен"
+I18N_RU[
+"bbr_enabled"]="BBR успешно включен"
+I18N_RU[
+"bbr_failed"]="Не удалось включить BBR"
+I18N_RU[
+"disabling_ipv6"]="Отключение IPv6..."
+I18N_RU[
+"enabling_ipv6"]="Включение IPv6..."
+I18N_RU[
+"ipv6_disabled"]="IPv6 отключен (требуется перезагрузка)"
+I18N_RU[
+"ipv6_enabled"]="IPv6 включен (требуется перезагрузка)"
+I18N_RU[
+"ipv6_status"]="Статус IPv6:"
+I18N_RU[
+"ipv6_disabled_sysctl"]="IPv6: ОТКЛЮЧЕН (через sysctl)"
+I18N_RU[
+"ipv6_enabled_sysctl"]="IPv6: ВКЛЮЧЕН (через sysctl)"
+I18N_RU[
+"public_ipv6"]="Публичный IPv6"
+I18N_RU[
+"not_detected"]="Не обнаружен"
+I18N_RU[
+"interfaces_with_ipv6"]="Интерфейсы с IPv6"
+I18N_RU[
+"server_information"]="ИНФОРМАЦИЯ О СЕРВЕРЕ"
+I18N_RU[
+"memory"]="Память"
+I18N_RU[
+"disk_usage"]="Использование диска"
+I18N_RU[
+"network"]="Сеть"
+I18N_RU[
+"public_ipv4"]="Публичный IPv4"
+I18N_RU[
+"virtualization"]="Виртуализация"
+I18N_RU[
+"unknown"]="Неизвестно"
+I18N_RU[
+"load_average"]="Средняя нагрузка"
+I18N_RU[
+"testing_network"]="Проверка сетевого соединения..."
+I18N_RU[
+"ipv4_connectivity"]="IPv4 соединение"
+I18N_RU[
+"reachable"]="ДОСТУПЕН"
+I18N_RU[
+"unreachable"]="НЕДОСТУПЕН"
+I18N_RU[
+"dns_resolution"]="DNS резолвинг"
+I18N_RU[
+"dns_ok"]="ОК"
+I18N_RU[
+"dns_failed"]="ОШИБКА"
+I18N_RU[
+"ipv6_connectivity"]="IPv6 соединение"
+I18N_RU[
+"no_public_ipv6"]="Публичный IPv6 не обнаружен"
+I18N_RU[
+"http_https"]="HTTP/HTTPS"
+I18N_RU[
+"http_ok"]="ОК"
+I18N_RU[
+"http_failed"]="ОШИБКА"
+I18N_RU[
+"http_code"]="код"
+I18N_RU[
+"installing_speedtest"]="Установка speedtest-cli..."
+I18N_RU[
+"speedtest_failed_install"]="Не удалось установить speedtest-cli"
+I18N_RU[
+"running_speedtest"]="Запуск теста скорости (это может занять 30-60 секунд)..."
+I18N_RU[
+"speedtest_failed"]="Тест скорости не удался"
+I18N_RU[
+"enter_domain"]="Введите домен для проверки"
+I18N_RU[
+"domain_required"]="Требуется домен"
+I18N_RU[
+"checking_domain"]="Проверка домена"
+I18N_RU[
+"a_records"]="A-записи (IPv4)"
+I18N_RU[
+"no_a_records"]="A-записи не найдены"
+I18N_RU[
+"aaaa_records"]="AAAA-записи (IPv6)"
+I18N_RU[
+"no_aaaa_records"]="AAAA-записи не найдены"
+I18N_RU[
+"server_ip"]="IP сервера"
+I18N_RU[
+"domain_matches"]="A-запись домена совпадает с IP сервера"
+I18N_RU[
+"domain_not_match"]="A-запись домена НЕ совпадает с IP сервера"
+I18N_RU[
+"https_check"]="Проверка HTTPS"
+I18N_RU[
+"https_accessible"]="HTTPS доступен"
+I18N_RU[
+"https_not_accessible"]="HTTPS недоступен или возвращает не-2xx"
+I18N_RU[
+"installing_3xui"]="Установка панели 3x-ui..."
+I18N_RU[
+"3xui_confirm"]="Будет установлена панель 3x-ui из репозитория MHSanaei. Продолжить?"
+I18N_RU[
+"3xui_download_failed"]="Не удалось скачать установщик 3x-ui"
+I18N_RU[
+"3xui_empty"]="Скачанный установщик пуст"
+I18N_RU[
+"3xui_install_failed"]="Установка 3x-ui не удалась"
+I18N_RU[
+"3xui_completed"]="Установка 3x-ui завершена"
+I18N_RU[
+"3xui_url"]="URL панели"
+I18N_RU[
+"3xui_username"]="Имя пользователя"
+I18N_RU[
+"3xui_password"]="Пароль"
+I18N_RU[
+"3xui_port"]="Порт (по умолчанию)"
+I18N_RU[
+"3xui_change_creds"]="ИЗМЕНИТЕ СТАНДАРТНЫЕ ДАННЫЕ СРАЗУ ПОСЛЕ ПЕРВОГО ВХОДА!"
+I18N_RU[
+"3xui_cancelled"]="Установка отменена"
+I18N_RU[
+"enter_username"]="Введите имя пользователя"
+I18N_RU[
+"username_empty"]="Имя пользователя не может быть пустым"
+I18N_RU[
+"invalid_username"]="Неверное имя пользователя. Используйте строчные буквы, цифры, подчеркивание, дефис. Начните с буквы/подчеркивания."
+I18N_RU[
+"user_exists"]="Пользователь уже существует"
+I18N_RU[
+"enter_password"]="Введите пароль"
+I18N_RU[
+"password_too_short"]="Пароль должен быть не менее 8 символов"
+I18N_RU[
+"confirm_password"]="Подтвердите пароль"
+I18N_RU[
+"passwords_not_match"]="Пароли не совпадают"
+I18N_RU[
+"user_created"]="Пользователь создан"
+I18N_RU[
+"failed_create_user"]="Не удалось создать пользователя"
+I18N_RU[
+"add_to_sudo"]="Добавить пользователя в группу sudo?"
+I18N_RU[
+"added_to_sudo"]="Добавлен в группу sudo"
+I18N_RU[
+"setup_ssh_key"]="Настроить SSH-ключ для этого пользователя?"
+I18N_RU[
+"paste_ssh_key"]="Вставьте публичный SSH-ключ"
+I18N_RU[
+"ssh_key_configured"]="SSH-ключ настроен"
+I18N_RU[
+"enter_username_sudo"]="Введите имя пользователя для sudo без пароля"
+I18N_RU[
+"user_not_found"]="Пользователь не найден"
+I18N_RU[
+"sudo_configured"]="Sudo без пароля настроен для"
+I18N_RU[
+"sudo_invalid"]="Неверный синтаксис sudoers, файл удален"
+I18N_RU[
+"exiting"]="Выход"
+I18N_RU[
+"internet_required"]="Для этой функции требуется интернет-соединение"
+I18N_RU[
+"cancelled"]="Отменено"
+I18N_RU[
+"continue"]="Продолжить?"
+I18N_RU[
+"yes"]="Да"
+I18N_RU[
+"no"]="Нет"
+I18N_RU[
+"back"]="Назад в главное меню"
+
+# Translation function
+_() {
+    local key="$1"
+    if [[ "$CURRENT_LANG" == "ru" && -n "${I18N_RU[$key]}" ]]; then
+        echo "${I18N_RU[$key]}"
+    else
+        echo "${I18N_EN[$key]}"
+    fi
+}
+
+# Language selection
+select_language() {
+    echo -e "${CYAN}${BOLD}"
+    echo "╔══════════════════════════════════════════════════════════════╗"
+    echo "║              Select Language / Выберите язык                 ║"
+    echo "╚══════════════════════════════════════════════════════════════╝"
+    echo -e "${NC}"
+    echo -e "  ${GREEN}1)${NC} English"
+    echo -e "  ${GREEN}2)${NC} Русский"
+    echo
+    read -r -p "$(echo -e "${YELLOW}Enter choice / Введите выбор [1-2]: ${NC}")" choice
+
+    case "$choice" in
+        2)
+            CURRENT_LANG="ru"
+            ok "Language set to: Русский"
+            ;;
+        1|*)
+            CURRENT_LANG="en"
+            ok "Language set to: English"
+            ;;
+    esac
+    echo
+}
+
+# =============================================================================
 # GLOBAL STATE (cached)
 # =============================================================================
 CACHED_PUBLIC_IP=""
@@ -98,7 +860,7 @@ CACHED_SSH_PORT=""
 # SIGNAL HANDLERS
 # =============================================================================
 cleanup() {
-    info "Interrupted by user. Cleaning up..."
+    info "$("interrupted_by_user")"
     exit 130
 }
 trap cleanup INT TERM
@@ -142,14 +904,16 @@ err()   { _log "ERR" "$@"; }
 
 # Confirmation prompt
 confirm() {
-    local prompt="${1:-Are you sure?}"
+    local prompt="${1:-$(_ "continue")}"
     local default="${2:-N}"
+    local yes_str="$(_ "yes")"
+    local no_str="$(_ "no")"
     local response
 
     if [[ "$default" =~ ^[Yy]$ ]]; then
-        prompt="$prompt [Y/n]: "
+        prompt="$prompt [$yes_str/$(_ "no")]: "
     else
-        prompt="$prompt [y/N]: "
+        prompt="$prompt [$(_ "yes")/$no_str]: "
     fi
 
     read -r -p "$(echo -e "${YELLOW}${prompt}${NC}")" response
