@@ -1731,7 +1731,7 @@ main() {
         print_header
         print_menu
 
-        read -r -p "$(echo -e "${YELLOW}Select option [1-16]: ${NC}")" choice
+        read -r -p "$(echo -e "${YELLOW}$(_ "select_option") [1-16]: ${NC}")" choice
 
         case "$choice" in
             1) update_system ;;
