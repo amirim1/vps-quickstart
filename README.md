@@ -6,6 +6,8 @@
 
 > Professional interactive server setup script for Debian/Ubuntu VPS
 
+**Languages:** [English](README.md) | [Русский](README.ru.md)
+
 A single-file Bash script with an interactive menu for initial VPS configuration. No external dependencies, no Python, no dialogs — just pure Bash.
 
 ## Features
