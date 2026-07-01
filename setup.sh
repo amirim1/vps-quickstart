@@ -2017,6 +2017,9 @@ main() {
     touch "$LOG_FILE"
     chmod 644 "$LOG_FILE"
 
+    # Language selection
+    select_language
+
     info "Starting $SCRIPT_NAME v$SCRIPT_VERSION"
 
     # Pre-flight checks
