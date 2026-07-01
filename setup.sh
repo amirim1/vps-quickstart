@@ -274,6 +274,35 @@ I18N_EN["continue"]="Continue?"
 I18N_EN["yes"]="Yes"
 I18N_EN["no"]="No"
 I18N_EN["select_option"]="Select option"
+I18N_EN["interrupted_by_user"]="Interrupted by user. Cleaning up..."
+I18N_EN["not_detected"]="Not detected"
+I18N_EN["cfg_firewall"]="Configure Firewall (UFW)"
+I18N_EN["allowed_port"]="Allowed port"
+I18N_EN["os"]="OS"
+I18N_EN["kernel"]="Kernel"
+I18N_EN["arch"]="Architecture"
+I18N_EN["uptime"]="Uptime"
+I18N_EN["cpu"]="CPU"
+I18N_EN["memory"]="Memory"
+I18N_EN["disk_usage"]="Disk Usage"
+I18N_EN["network"]="Network"
+I18N_EN["virtualization"]="Virtualization"
+I18N_EN["load_average"]="Load Average"
+I18N_EN["unknown"]="Unknown"
+I18N_EN["public_ipv4"]="Public IPv4"
+I18N_EN["public_ipv6"]="Public IPv6"
+I18N_EN["testing_network"]="Testing network connectivity..."
+I18N_EN["ipv4_conn"]="IPv4 Connectivity"
+I18N_EN["reachable"]="REACHABLE"
+I18N_EN["unreachable"]="UNREACHABLE"
+I18N_EN["dns_resolution"]="DNS Resolution"
+I18N_EN["dns_ok"]="OK"
+I18N_EN["dns_fail"]="FAILED"
+I18N_EN["ipv6_conn"]="IPv6 Connectivity"
+I18N_EN["no_ipv6"]="No public IPv6 detected"
+I18N_EN["https_https"]="HTTP/HTTPS"
+I18N_EN["https_ok"]="OK"
+I18N_EN["http_fail"]="FAILED"
 
 # Russian translations
 I18N_RU["lang_name"]="Русский"
@@ -455,6 +484,35 @@ I18N_RU["continue"]="Продолжить?"
 I18N_RU["yes"]="Да"
 I18N_RU["no"]="Нет"
 I18N_RU["select_option"]="Выберите вариант"
+I18N_RU["interrupted_by_user"]="Прервано пользователем. Очистка..."
+I18N_RU["not_detected"]="Не обнаружен"
+I18N_RU["cfg_firewall"]="Настройка Firewall (UFW)"
+I18N_RU["allowed_port"]="Открыт порт"
+I18N_RU["os"]="ОС"
+I18N_RU["kernel"]="Ядро"
+I18N_RU["arch"]="Архитектура"
+I18N_RU["uptime"]="Время работы"
+I18N_RU["cpu"]="Процессор"
+I18N_RU["memory"]="Память"
+I18N_RU["disk_usage"]="Использование диска"
+I18N_RU["network"]="Сеть"
+I18N_RU["virtualization"]="Виртуализация"
+I18N_RU["load_average"]="Средняя нагрузка"
+I18N_RU["unknown"]="Неизвестно"
+I18N_RU["public_ipv4"]="Публичный IPv4"
+I18N_RU["public_ipv6"]="Публичный IPv6"
+I18N_RU["testing_network"]="Проверка сетевого соединения..."
+I18N_RU["ipv4_conn"]="IPv4 соединение"
+I18N_RU["reachable"]="ДОСТУПЕН"
+I18N_RU["unreachable"]="НЕДОСТУПЕН"
+I18N_RU["dns_resolution"]="DNS резолвинг"
+I18N_RU["dns_ok"]="ОК"
+I18N_RU["dns_fail"]="ОШИБКА"
+I18N_RU["ipv6_conn"]="IPv6 соединение"
+I18N_RU["no_ipv6"]="Публичный IPv6 не обнаружен"
+I18N_RU["https_https"]="HTTP/HTTPS"
+I18N_RU["https_ok"]="ОК"
+I18N_RU["http_fail"]="ОШИБКА"
 I18N_RU["back"]="Назад в главное меню"
 
 # Translation function
@@ -503,7 +561,7 @@ CACHED_SSH_PORT=""
 # SIGNAL HANDLERS
 # =============================================================================
 cleanup() {
-    info "$("interrupted_by_user")"
+    info "$(_ "interrupted_by_user")"
     exit 130
 }
 trap cleanup INT TERM
@@ -832,7 +890,7 @@ service_active() {
 
 # Press any key to continue
 press_any_key() {
-    echo -e "\n${CYAN}Press any key to continue...${NC}"
+    echo -e "\n${CYAN}$(_ "press_any_key")${NC}"
     read -n 1 -s -r
     echo
 }
@@ -855,7 +913,6 @@ get_current_ssh_port() {
     echo "$port"
 }
 
-# Print header (NO clear, NO HTTP requests)
 print_header() {
     echo -e "${CYAN}${BOLD}"
     echo "╔══════════════════════════════════════════════════════════════╗"
@@ -864,10 +921,8 @@ print_header() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 
-    # Use cached values instead of HTTP requests
     local os_info="Unknown"
     if [[ -f /etc/os-release ]]; then
-        # shellcheck source=/dev/null
         source /etc/os-release
         os_info="$PRETTY_NAME"
     fi
@@ -876,7 +931,7 @@ print_header() {
     echo -e "${BLUE}Kernel:${NC} $(uname -r)"
     echo -e "${BLUE}Arch:${NC} $(uname -m)"
     echo -e "${BLUE}Uptime:${NC} $(uptime -p 2>/dev/null || uptime | sed 's/.*up \([^,]*\),.*/\1/')"
-    echo -e "${BLUE}IPv4:${NC} ${CACHED_PUBLIC_IP:-Not detected}"
+    echo -e "${BLUE}IPv4:${NC} ${CACHED_PUBLIC_IP:-$(_ "not_detected")}"
     [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "${BLUE}IPv6:${NC} $CACHED_PUBLIC_IPV6"
     echo
 }
@@ -1052,13 +1107,13 @@ configure_firewall() {
     local ssh_port
     ssh_port=$(get_current_ssh_port)
     ufw allow "$ssh_port"/tcp comment "SSH"
-    ok "$(_ "configure_ssh") $ssh_port"
+    ok "$(_ "allowed_port"): $ssh_port ($(_ "configure_ssh"))"
 
     # Allow additional ports
     for port in "${UFW_PORTS[@]}"; do
         if [[ "$port" != "$ssh_port" ]]; then
             ufw allow "$port"/tcp comment "Service"
-            ok "$(_ "configure_firewall") $port"
+            ok "$(_ "allowed_port"): $port"
         fi
     done
 
@@ -1300,55 +1355,45 @@ check_ipv6_status() {
     done
 }
 
-# 9. Server Information
 server_info() {
     print_header
-    echo -e "${BOLD}════════════════════════════ SERVER INFORMATION ════════════════════════════${NC}"
+    echo -e "${BOLD}════════════════════════════ $(_ "server_info") ════════════════════════════${NC}"
 
-    # OS Info
-    local os_info="Unknown"
+    local os_info="$(_ "unknown")"
     if [[ -f /etc/os-release ]]; then
-        # shellcheck source=/dev/null
         source /etc/os-release
         os_info="$PRETTY_NAME"
     fi
-    echo -e "${CYAN}OS:${NC} $os_info"
-    echo -e "${CYAN}Kernel:${NC} $(uname -r)"
-    echo -e "${CYAN}Architecture:${NC} $(uname -m)"
+    echo -e "${CYAN}$(_ "os"):${NC} $os_info"
+    echo -e "${CYAN}$(_ "kernel"):${NC} $(uname -r)"
+    echo -e "${CYAN}$(_ "arch"):${NC} $(uname -m)"
 
-    # CPU
-    echo -e "\n${CYAN}CPU:${NC}"
+    echo -e "\n${CYAN}$(_ "cpu"):${NC}"
     lscpu 2>/dev/null | grep -E 'Model name|CPU\(s\):|Thread|Core|MHz' | sed 's/^/  /'
 
-    # Memory
-    echo -e "\n${CYAN}Memory:${NC}"
+    echo -e "\n${CYAN}$(_ "memory"):${NC}"
     free -h | sed 's/^/  /'
 
-    # Disk
-    echo -e "\n${CYAN}Disk Usage:${NC}"
+    echo -e "\n${CYAN}$(_ "disk_usage"):${NC}"
     df -h / | sed 's/^/  /'
     echo
     df -h | grep -vE '^Filesystem|tmpfs|udev' | sed 's/^/  /'
 
-    # Network
-    echo -e "\n${CYAN}Network:${NC}"
-    echo -e "  Public IPv4: ${CACHED_PUBLIC_IP:-Not detected}"
-    [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "  Public IPv6: $CACHED_PUBLIC_IPV6"
-
+    echo -e "\n${CYAN}$(_ "network"):${NC}"
+    echo -e "  $(_ "public_ipv4"): ${CACHED_PUBLIC_IP:-$(_ "not_detected")}"
+    [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "  $(_ "public_ipv6"): $CACHED_PUBLIC_IPV6"
     ip -4 addr show scope global 2>/dev/null | grep -E '^ [0-9]+:|inet ' | sed 's/^/  /'
 
-    # Virtualization
-    echo -e "\n${CYAN}Virtualization:${NC}"
+    echo -e "\n${CYAN}$(_ "virtualization"):${NC}"
     if command_exists systemd-detect-virt; then
         echo -e "  $(systemd-detect-virt)"
     elif command_exists virt-what; then
         virt-what | sed 's/^/  /'
     else
-        echo "  Unknown"
+        echo "  $(_ "unknown")"
     fi
 
-    # Load
-    echo -e "\n${CYAN}Load Average:${NC} $(uptime | awk -F'load average:' '{print $2}')"
+    echo -e "\n${CYAN}$(_ "load_average"):${NC} $(uptime | awk -F'load average:' '{print $2}')"
 
     echo -e "${BOLD}═══════════════════════════════════════════════════════════════════════${NC}"
 }
