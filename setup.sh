@@ -54,7 +54,6 @@ readonly PACKAGES=(
 
 # SSH Configuration
 readonly SSH_CONFIG_FILE="/etc/ssh/sshd_config"
-readonly SSH_CONFIG_BACKUP="/etc/ssh/sshd_config.backup.$(date +%s%N)"
 
 # UFW Configuration
 readonly UFW_PORTS=(22 80 443)
@@ -280,6 +279,10 @@ I18N_EN["dig_not_found"]="dig command not found. Install dnsutils first (option 
 I18N_EN["pip3_not_found"]="speedtest-cli not available and pip3 not found"
 I18N_EN["default"]="default"
 I18N_EN["default_3xui_info"]="Default 3x-ui Info"
+I18N_EN["lang_set"]="Language set to:"
+I18N_EN["ipv6_mgmt_title"]="IPv6 MANAGEMENT"
+I18N_EN["speedtest_pip_fail"]="Package install failed. Trying pip3..."
+I18N_EN["sysctl_failed"]="sysctl --system returned non-zero"
 I18N_EN["not_detected"]="Not detected"
 I18N_EN["cfg_firewall"]="Configure Firewall (UFW)"
 I18N_EN["allowed_port"]="Allowed port"
@@ -510,6 +513,10 @@ I18N_RU["dig_not_found"]="Команда dig не найдена. Установ
 I18N_RU["pip3_not_found"]="speedtest-cli недоступен и pip3 не найден"
 I18N_RU["default"]="по умолчанию"
 I18N_RU["default_3xui_info"]="Информация 3x-ui (по умолчанию)"
+I18N_RU["lang_set"]="Язык установлен:"
+I18N_RU["ipv6_mgmt_title"]="УПРАВЛЕНИЕ IPv6"
+I18N_RU["speedtest_pip_fail"]="Установка пакета не удалась. Пробую pip3..."
+I18N_RU["sysctl_failed"]="sysctl --system вернул ненулевой код"
 I18N_RU["back"]="Назад в главное меню"
 
 # Translation function
@@ -529,19 +536,19 @@ select_language() {
     echo "║              Select Language / Выберите язык                 ║"
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
-    echo -e "  ${GREEN}1)${NC} English"
-    echo -e "  ${GREEN}2)${NC} Русский"
+    echo -e "  ${GREEN}$(_ "lang_en")${NC}"
+    echo -e "  ${GREEN}$(_ "lang_ru")${NC}"
     echo
     read -r -p "$(echo -e "${YELLOW}Enter choice / Введите выбор [1-2]: ${NC}")" choice
 
     case "$choice" in
         2)
             CURRENT_LANG="ru"
-            ok "Language set to: Русский"
+            ok "$(_ "lang_set") $(_ "lang_name")"
             ;;
         1|*)
             CURRENT_LANG="en"
-            ok "Language set to: English"
+            ok "$(_ "lang_set") $(_ "lang_name")"
             ;;
     esac
     echo
@@ -737,17 +744,31 @@ get_public_ipv6() {
     echo "$ip"
 }
 
-# Cache IPs on startup
+# Cache IPs on startup with fallback providers
 cache_ips() {
-    CACHED_PUBLIC_IP=$(curl -fsSL -4 --max-time 5 https://api.ipify.org 2>/dev/null) || true
-    CACHED_PUBLIC_IPV6=$(curl -fsSL -6 --max-time 5 https://api6.ipify.org 2>/dev/null) || true
+    CACHED_PUBLIC_IP=$(curl -fsSL -4 --max-time 5 https://api.ipify.org 2>/dev/null) || \
+    CACHED_PUBLIC_IP=$(curl -fsSL -4 --max-time 5 https://ifconfig.me 2>/dev/null) || \
+    CACHED_PUBLIC_IP=$(curl -fsSL -4 --max-time 5 https://icanhazip.com 2>/dev/null) || true
+    CACHED_PUBLIC_IPV6=$(curl -fsSL -6 --max-time 5 https://api6.ipify.org 2>/dev/null) || \
+    CACHED_PUBLIC_IPV6=$(curl -fsSL -6 --max-time 5 https://ifconfig.me 2>/dev/null) || true
 }
 
 # Wait for apt lock
 wait_apt_lock() {
     local max_wait=120
     local waited=0
-    while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do
+    local locks=("/var/lib/dpkg/lock-frontend" "/var/lib/dpkg/lock" "/var/lib/apt/lists/lock")
+    while true; do
+        local locked=false
+        for lock in "${locks[@]}"; do
+            if fuser "$lock" >/dev/null 2>&1; then
+                locked=true
+                break
+            fi
+        done
+        if [[ "$locked" == false ]]; then
+            break
+        fi
         if [[ $waited -ge $max_wait ]]; then
             err "apt lock timeout after ${max_wait}s"
             return 1
@@ -918,28 +939,24 @@ print_header() {
     echo "╚══════════════════════════════════════════════════════════════╝"
     echo -e "${NC}"
 
-    local os_info="Unknown"
+    local os_info="$(_ "unknown")"
     if [[ -f /etc/os-release ]]; then
         source /etc/os-release
         os_info="$PRETTY_NAME"
     fi
 
-    echo -e "${BLUE}OS:${NC} $os_info"
-    echo -e "${BLUE}Kernel:${NC} $(uname -r)"
-    echo -e "${BLUE}Arch:${NC} $(uname -m)"
-    echo -e "${BLUE}Uptime:${NC} $(uptime -p 2>/dev/null || uptime | sed 's/.*up \([^,]*\),.*/\1/')"
-    echo -e "${BLUE}IPv4:${NC} ${CACHED_PUBLIC_IP:-$(_ "not_detected")}"
-    [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "${BLUE}IPv6:${NC} $CACHED_PUBLIC_IPV6"
+    echo -e "${BLUE}$(_ "os"):${NC} $os_info"
+    echo -e "${BLUE}$(_ "kernel"):${NC} $(uname -r)"
+    echo -e "${BLUE}$(_ "arch"):${NC} $(uname -m)"
+    echo -e "${BLUE}$(_ "uptime"):${NC} $(uptime -p 2>/dev/null || uptime | sed 's/.*up \([^,]*\),.*/\1/')"
+    echo -e "${BLUE}$(_ "public_ipv4"):${NC} ${CACHED_PUBLIC_IP:-$(_ "not_detected")}"
+    [[ -n "$CACHED_PUBLIC_IPV6" ]] && echo -e "${BLUE}$(_ "public_ipv6"):${NC} $CACHED_PUBLIC_IPV6"
     echo
 }
 
 # Print menu
 print_menu() {
-    local menu_title="MENU"
-    if [[ "$CURRENT_LANG" == "ru" ]]; then
-        menu_title="МЕНЮ"
-    fi
-    echo -e "${BOLD}════════════════════════════ $menu_title ════════════════════════════${NC}"
+    echo -e "${BOLD}════════════════════════════ $(_ "menu_title") ════════════════════════════${NC}"
     echo -e "  ${GREEN}1)${NC}  $(_ "update_system")"
     echo -e "  ${GREEN}2)${NC}  $(_ "install_base_packages")"
     echo -e "  ${GREEN}3)${NC}  $(_ "configure_ssh")"
@@ -1032,7 +1049,7 @@ configure_ssh() {
         err "$(_ "invalid_port")"
     done
 
-    # Disable password auth?
+    # Disable password auth? — confirm Yes means disable → set PasswordAuthentication=no
     local disable_password
     if confirm "$(_ "disable_password_auth")" "N"; then
         disable_password="no"
@@ -1040,7 +1057,7 @@ configure_ssh() {
         disable_password="yes"
     fi
 
-    # Disable root login?
+    # Disable root login? — confirm Yes means disable → set PermitRootLogin=no
     local disable_root
     if confirm "$(_ "disable_root_login")" "Y"; then
         disable_root="no"
@@ -1153,8 +1170,8 @@ logpath = %(sshd_log)s
 maxretry = 3
 EOF
 
-    enable_service fail2ban
-    restart_service fail2ban
+    enable_service fail2ban || true
+    restart_service fail2ban || true
     ok "$(_ "fail2ban_configured") $ssh_port)"
     return 0
 }
@@ -1263,11 +1280,7 @@ EOF
 manage_ipv6() {
     while true; do
         print_header
-        local ipv6_title="IPv6 MANAGEMENT"
-        if [[ "$CURRENT_LANG" == "ru" ]]; then
-            ipv6_title="УПРАВЛЕНИЕ IPv6"
-        fi
-        echo -e "${BOLD}════════════════════════════ $ipv6_title ════════════════════════════${NC}"
+        echo -e "${BOLD}════════════════════════════ $(_ "ipv6_mgmt_title") ════════════════════════════${NC}"
         echo -e "  ${GREEN}1)${NC} $(_ "disabling_ipv6")"
         echo -e "  ${GREEN}2)${NC} $(_ "enabling_ipv6")"
         echo -e "  ${GREEN}3)${NC} $(_ "ipv6_status")"
@@ -1296,7 +1309,7 @@ net.ipv6.conf.lo.disable_ipv6 = 1
 EOF
 
     if ! sysctl --system 2>/dev/null; then
-        warn "sysctl --system returned non-zero"
+        warn "$(_ "sysctl_failed")"
     fi
 
     # Update UFW to disable IPv6
@@ -1314,7 +1327,7 @@ enable_ipv6() {
     info "$(_ "enabling_ipv6")"
     rm -f /etc/sysctl.d/99-disable-ipv6.conf
     if ! sysctl --system 2>/dev/null; then
-        warn "sysctl --system returned non-zero"
+        warn "$(_ "sysctl_failed")"
     fi
 
     # Update UFW to enable IPv6
@@ -1458,7 +1471,7 @@ speed_test() {
     if ! command_exists "$SPEEDTEST_CMD"; then
         info "$(_ "installing_speedtest")"
         if ! install_package speedtest-cli; then
-            warn "Package install failed. Trying pip3..."
+            warn "$(_ "speedtest_pip_fail")"
             if command_exists pip3; then
                 if ! pip3 install speedtest-cli 2>/dev/null && ! pip3 install --break-system-packages speedtest-cli 2>/dev/null; then
                     err "$(_ "speedtest_failed_install")"
@@ -1735,7 +1748,7 @@ main() {
                 exit 0
                 ;;
             *)
-                err "Invalid option: $choice"
+                err "$(_ "invalid_option"): $choice"
                 ;;
         esac
 
