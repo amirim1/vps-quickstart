@@ -21,7 +21,7 @@ shopt -s inherit_errexit 2>/dev/null || true
 # CURL-BASH SUPPORT: If piped, download and execute locally
 # =============================================================================
 if [[ ! -t 0 ]]; then
-    SCRIPT_URL="https://raw.githubusercontent.com/your-repo/vps-quickstart/main/setup.sh"
+    SCRIPT_URL="https://raw.githubusercontent.com/amirim1/vps-quickstart/main/setup.sh"
     TEMP_SCRIPT=$(mktemp --suffix=.sh)
     trap 'rm -f "$TEMP_SCRIPT"' EXIT
 
@@ -44,7 +44,7 @@ fi
 # =============================================================================
 readonly SCRIPT_VERSION="1.1.0"
 readonly SCRIPT_NAME="VPS QuickStart"
-readonly SCRIPT_REPO="https://raw.githubusercontent.com/your-repo/vps-quickstart/main"
+readonly SCRIPT_REPO="https://raw.githubusercontent.com/amirim1/vps-quickstart/main"
 
 # System packages to install
 readonly PACKAGES=(

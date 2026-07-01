@@ -1,0 +1,16 @@
+# macOS
+.DS_Store
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Test files
+*.bak
+*.tmp
+test/
+
+# Local config (if any)
+.env
