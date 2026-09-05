@@ -11,7 +11,7 @@ jobs:
     name: Bash lint & i18n consistency
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Syntax check (bash -n)
         run: bash -n setup.sh
