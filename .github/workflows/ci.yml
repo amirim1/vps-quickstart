@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    name: Bash lint & i18n consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Syntax check (bash -n)
+        run: bash -n setup.sh
+
+      - name: ShellCheck
+        run: |
+          shellcheck --version
+          # Fail on errors only; style warnings are not release blockers
+          shellcheck --severity=error setup.sh
+
+      - name: i18n key consistency
+        run: |
+          set -euo pipefail
+          used=$(grep -oE '\b_ "[A-Za-z0-9_]+"' setup.sh | sed 's/_ "//; s/"//' | sort -u)
+          en=$(grep -oE '^I18N_EN\["[A-Za-z0-9_]+"\]' setup.sh | sed 's/^I18N_EN\["//; s/"\]//' | sort -u)
+          ru=$(grep -oE '^I18N_RU\["[A-Za-z0-9_]+"\]' setup.sh | sed 's/^I18N_RU\["//; s/"\]//' | sort -u)
+
+          fail=0
+          missing_en=$(comm -23 <(echo "$used") <(echo "$en") || true)
+          missing_ru=$(comm -23 <(echo "$used") <(echo "$ru") || true)
+          if [[ -n "$missing_en" ]]; then
+            echo "::error::Keys used but missing from I18N_EN:"; echo "$missing_en"; fail=1
+          fi
+          if [[ -n "$missing_ru" ]]; then
+            echo "::error::Keys used but missing from I18N_RU:"; echo "$missing_ru"; fail=1
+          fi
+          if ! diff <(echo "$en") <(echo "$ru"); then
+            echo "::error::I18N_EN and I18N_RU key sets differ"; fail=1
+          fi
+          exit $fail
