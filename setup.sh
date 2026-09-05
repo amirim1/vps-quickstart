@@ -927,7 +927,7 @@ press_any_key() {
     echo
 }
 
-# Get current SSH port from config
+# Get current SSH port from effective sshd configuration
 get_current_ssh_port() {
     if [[ -n "$CACHED_SSH_PORT" ]]; then
         echo "$CACHED_SSH_PORT"
@@ -935,7 +935,14 @@ get_current_ssh_port() {
     fi
 
     local port=22
-    if [[ -f "$SSH_CONFIG_FILE" ]]; then
+
+    # Prefer the effective value: sshd honors Include drop-ins
+    # (sshd_config.d/*.conf) which the main config grep cannot see
+    if command_exists sshd; then
+        local effective
+        effective=$(sshd -T 2>/dev/null | awk '$1 == "port" {print $2; exit}')
+        [[ -n "$effective" ]] && port="$effective"
+    elif [[ -f "$SSH_CONFIG_FILE" ]]; then
         local config_port
         config_port=$(grep -E "^\s*Port\s+[0-9]+" "$SSH_CONFIG_FILE" | tail -1 | awk '{print $2}')
         [[ -n "$config_port" ]] && port="$config_port"
@@ -1042,6 +1049,11 @@ install_base_packages() {
 
 # 3. Configure SSH
 configure_ssh() {
+    if ! command_exists sshd; then
+        err "$(_ "sshd_not_found")"
+        return 1
+    fi
+
     info "$(_ "configuring_ssh")"
 
     # Backup current config
@@ -1086,6 +1098,20 @@ configure_ssh() {
     # Apply changes
     info "$(_ "applying_ssh")"
 
+    # Write a managed drop-in as well: sshd uses the FIRST occurrence of a
+    # directive and includes sshd_config.d/*.conf before the main file on
+    # modern Debian/Ubuntu, so this overrides e.g. cloud-init's
+    # 50-cloud-init.conf that often re-enables PasswordAuthentication
+    local dropin_dir="/etc/ssh/sshd_config.d"
+    mkdir -p "$dropin_dir"
+    cat > "$dropin_dir/00-vps-quickstart.conf" <<EOF
+# Managed by VPS QuickStart — do not edit
+Port $new_port
+PasswordAuthentication $disable_password
+PermitRootLogin $disable_root
+PubkeyAuthentication yes
+EOF
+
     # Port
     sed -i "s/^#*Port .*/Port $new_port/" "$SSH_CONFIG_FILE"
     grep -q "^Port " "$SSH_CONFIG_FILE" || echo "Port $new_port" >> "$SSH_CONFIG_FILE"
@@ -1106,11 +1132,19 @@ configure_ssh() {
     if ! test_ssh_config; then
         err "$(_ "ssh_config_failed")"
         restore_file "$SSH_CONFIG_FILE"
+        rm -f "$dropin_dir/00-vps-quickstart.conf"
+        test_ssh_config || true
         return 1
     fi
 
-    CACHED_SSH_PORT="$new_port"
-    restart_service ssh || return 1
+    # Cache the new port only after the service restarted successfully;
+    # invalidate otherwise so later UFW/fail2ban calls re-read the effective port
+    if restart_service ssh; then
+        CACHED_SSH_PORT="$new_port"
+    else
+        CACHED_SSH_PORT=""
+        return 1
+    fi
 
     ok "$(_ "ssh_configured") $new_port"
     warn "$(_ "ssh_warning")"
@@ -1634,6 +1668,12 @@ install_3xui() {
     fi
 }
 
+# Validate a public SSH key: "ssh-ed25519|ssh-rsa|ecdsa-... [sk-...] <base64> [comment]"
+validate_ssh_public_key() {
+    local key="$1"
+    [[ "$key" =~ ^(sk-)?(ssh-(ed25519|rsa|dss)|ecdsa-sha2-nistp(256|384|521))(-cert\.v0[0-9]@openssh\.com)?[[:space:]]+[A-Za-z0-9+/=]+ ]]
+}
+
 # 14. Create User
 create_user() {
     local username
@@ -1678,8 +1718,13 @@ create_user() {
     [[ "$password" != "$confirm_pass" ]] && { err "$(_ "passwords_not_match")"; return 1; }
 
     if useradd -m -s /bin/bash "$username" 2>/dev/null; then
-        echo "$username:$password" | chpasswd
-        ok "$(_ "user_created"): $username"
+        if echo "$username:$password" | chpasswd 2>/dev/null; then
+            ok "$(_ "user_created"): $username"
+        else
+            err "$(_ "failed_set_password")"
+            userdel -r "$username" 2>/dev/null
+            return 1
+        fi
     else
         err "$(_ "failed_create_user")"
         return 1
@@ -1693,7 +1738,12 @@ create_user() {
     if confirm "$(_ "setup_ssh_key")" "N"; then
         local ssh_key
         read -r -p "$(echo -e "${YELLOW}$(_ "paste_ssh_key"): ${NC}")" ssh_key
-        if [[ -n "$ssh_key" ]]; then
+        if [[ -z "$ssh_key" ]]; then
+            warn "$(_ "cancelled")"
+        elif ! validate_ssh_public_key "$ssh_key"; then
+            err "$(_ "invalid_ssh_key")"
+            return 1
+        else
             local ssh_dir="/home/$username/.ssh"
             mkdir -p "$ssh_dir"
             echo "$ssh_key" > "$ssh_dir/authorized_keys"
