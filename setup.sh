@@ -77,8 +77,8 @@ readonly PACKAGES=(
 # SSH Configuration
 readonly SSH_CONFIG_FILE="/etc/ssh/sshd_config"
 
-# UFW Configuration
-readonly UFW_PORTS=(22 80 443)
+# UFW Configuration — service ports opened in addition to the current SSH port
+readonly UFW_PORTS=(80 443)
 
 # Swap Configuration
 readonly SWAP_FILE="/swapfile"
@@ -1159,8 +1159,12 @@ configure_firewall() {
 
     # Warning about reset
     if confirm "$(_ "ufw_reset_warning")" "N"; then
-        ufw --force reset 2>/dev/null
-        ok "$(_ "ufw_rules_reset")"
+        if ufw --force reset >/dev/null 2>&1; then
+            ok "$(_ "ufw_rules_reset")"
+        else
+            err "$(_ "ufw_reset_failed")"
+            return 1
+        fi
     else
         info "$(_ "ufw_skipping_reset")"
     fi
@@ -1200,6 +1204,9 @@ install_fail2ban() {
     info "$(_ "installing_fail2ban")"
 
     install_package fail2ban || return 1
+    # Debian 12: the systemd backend needs python3-systemd, which minimal
+    # images (or --no-install-recommends installs) do not pull in
+    install_package python3-systemd || true
 
     # Get current SSH port for jail config
     local ssh_port
@@ -1213,18 +1220,23 @@ bantime = 3600
 findtime = 600
 maxretry = 3
 backend = systemd
+allowipv6 = auto
 
 [sshd]
 enabled = true
 port = $ssh_port
-filter = sshd
-logpath = %(sshd_log)s
 maxretry = 3
 EOF
 
     enable_service fail2ban || true
     restart_service fail2ban || true
-    ok "$(_ "fail2ban_configured") $ssh_port)"
+
+    if service_active fail2ban; then
+        ok "$(_ "fail2ban_configured") $ssh_port)"
+    else
+        err "$(_ "fail2ban_not_running")"
+        return 1
+    fi
     return 0
 }
 
