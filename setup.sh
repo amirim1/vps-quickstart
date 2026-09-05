@@ -2,12 +2,12 @@
 ################################################################################
 # VPS QuickStart - Professional Server Setup Script
 # Version: 1.1.0
-# Repository: https://github.com/your-repo/vps-quickstart
+# Repository: https://github.com/amirim1/vps-quickstart
 # License: MIT
-# Author: Senior Linux Engineer
+# Author: amirim1
 #
 # Usage:
-#   bash <(curl -fsSL https://raw.githubusercontent.com/your-repo/main/setup.sh)
+#   bash <(curl -fsSL https://raw.githubusercontent.com/amirim1/vps-quickstart/main/setup.sh)
 #   bash setup.sh
 ################################################################################
 
