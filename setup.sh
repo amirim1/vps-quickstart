@@ -769,16 +769,28 @@ cache_ips() {
 
 # Wait for apt lock
 wait_apt_lock() {
+    # Detect who can check the locks: fuser (psmisc) may be missing on
+    # minimal images; fall back to lsof, otherwise skip waiting
+    local checker=""
+    if command_exists fuser; then
+        checker="fuser"
+    elif command_exists lsof; then
+        checker="lsof"
+    else
+        return 0
+    fi
+
     local max_wait=120
     local waited=0
     local locks=("/var/lib/dpkg/lock-frontend" "/var/lib/dpkg/lock" "/var/lib/apt/lists/lock")
     while true; do
         local locked=false
         for lock in "${locks[@]}"; do
-            if fuser "$lock" >/dev/null 2>&1; then
-                locked=true
-                break
-            fi
+            case "$checker" in
+                fuser) fuser "$lock" >/dev/null 2>&1 && locked=true ;;
+                lsof)  lsof "$lock" >/dev/null 2>&1 && locked=true ;;
+            esac
+            [[ "$locked" == true ]] && break
         done
         if [[ "$locked" == false ]]; then
             break
@@ -859,11 +871,14 @@ backup_file() {
     fi
 }
 
-# Restore file from most recent backup
+# Restore file from most recent backup (backup names sort chronologically)
 restore_file() {
     local file="$1"
-    local backup
-    backup=$(ls -t "${file}.backup."* 2>/dev/null | head -1)
+    local backup="" f
+    for f in "$file".backup.*; do
+        [[ -f "$f" ]] || continue
+        [[ -z "$backup" || "$f" > "$backup" ]] && backup="$f"
+    done
     if [[ -n "$backup" ]]; then
         cp "$backup" "$file"
         ok "$(_ "restored"): $file <- $backup"
@@ -1291,12 +1306,15 @@ create_swap() {
     if ! mkswap "$SWAP_FILE" 2>/dev/null; then
         err "$(_ "mkswap_failed")"
         rm -f "$SWAP_FILE"
+        # The file is gone — don't leave a dangling fstab entry behind
+        sed -i "\|^${SWAP_FILE} |d" /etc/fstab 2>/dev/null
         return 1
     fi
 
     if ! swapon "$SWAP_FILE" 2>/dev/null; then
         err "$(_ "swapon_failed")"
         rm -f "$SWAP_FILE"
+        sed -i "\|^${SWAP_FILE} |d" /etc/fstab 2>/dev/null
         return 1
     fi
 
@@ -1330,10 +1348,9 @@ net.core.default_qdisc = fq
 net.ipv4.tcp_congestion_control = bbr
 EOF
 
-    if ! sysctl --system 2>/dev/null; then
-        err "$(_ "bbr_failed")"
-        return 1
-    fi
+    # sysctl --system returns non-zero on any unrelated bad drop-in, so only
+    # warn here; the authoritative check is whether bbr got applied
+    sysctl --system >/dev/null 2>&1 || warn "$(_ "sysctl_failed")"
 
     if sysctl net.ipv4.tcp_congestion_control 2>/dev/null | grep -q bbr; then
         ok "$(_ "bbr_enabled")"
@@ -1391,6 +1408,8 @@ EOF
         fi
     fi
 
+    # Public IPv6 is gone now — drop the stale cache
+    CACHED_PUBLIC_IPV6=""
     ok "$(_ "ipv6_disabled")"
 }
 
@@ -1409,6 +1428,9 @@ enable_ipv6() {
         fi
     fi
 
+    # Re-check whether the host actually has public IPv6 now
+    CACHED_PUBLIC_IPV6=""
+    cache_ips
     ok "$(_ "ipv6_enabled")"
 }
 
@@ -1501,13 +1523,17 @@ network_test() {
     done
 
     echo -e "\n${BOLD}$(_ "dns_resolution"):${NC}"
-    for dns in "8.8.8.8" "1.1.1.1" "9.9.9.9"; do
-        if dig @"$dns" google.com +short +time=3 >/dev/null 2>&1; then
-            ok "  DNS $dns: $(_ "dns_ok")"
-        else
-            err "  DNS $dns: $(_ "dns_failed")"
-        fi
-    done
+    if ! command_exists dig; then
+        warn "  $(_ "dig_not_found")"
+    else
+        for dns in "8.8.8.8" "1.1.1.1" "9.9.9.9"; do
+            if dig @"$dns" google.com +short +time=3 >/dev/null 2>&1; then
+                ok "  DNS $dns: $(_ "dns_ok")"
+            else
+                err "  DNS $dns: $(_ "dns_failed")"
+            fi
+        done
+    fi
 
     echo -e "\n${BOLD}$(_ "ipv6_connectivity"):${NC}"
     if [[ -n "$CACHED_PUBLIC_IPV6" ]]; then
@@ -1522,18 +1548,18 @@ network_test() {
 
     echo -e "\n${BOLD}$(_ "http_https"):${NC}"
     local http_code
-    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" https://google.com 2>/dev/null)
-    if [[ "$http_code" == "200" ]]; then
+    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" https://www.google.com 2>/dev/null)
+    if http_status_ok "$http_code"; then
         ok "  HTTPS (google.com): $(_ "http_ok")"
     else
         err "  HTTPS (google.com): $(_ "http_failed") ($(_ "http_code"): $http_code)"
     fi
 
-    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" http://httpbin.org/get 2>/dev/null)
-    if [[ "$http_code" == "200" ]]; then
-        ok "  HTTP (httpbin.org): $(_ "http_ok")"
+    http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" http://example.com 2>/dev/null)
+    if http_status_ok "$http_code"; then
+        ok "  HTTP (example.com): $(_ "http_ok")"
     else
-        err "  HTTP (httpbin.org): $(_ "http_failed") ($(_ "http_code"): $http_code)"
+        err "  HTTP (example.com): $(_ "http_failed") ($(_ "http_code"): $http_code)"
     fi
 }
 
@@ -1571,11 +1597,21 @@ speed_test() {
     fi
 }
 
+# HTTP status is OK (2xx-3xx; redirects are fine for connectivity checks)
+http_status_ok() {
+    [[ "$1" =~ ^[0-9]+$ ]] && (( $1 >= 200 && $1 < 400 ))
+}
+
 # 12. Domain Check
 domain_check() {
     local domain
     read -r -p "$(echo -e "${YELLOW}$(_ "enter_domain"): ${NC}")" domain
     [[ -z "$domain" ]] && { err "$(_ "domain_required")"; return 1; }
+
+    if [[ ! "$domain" =~ ^[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?)+$ ]]; then
+        err "$(_ "invalid_domain")"
+        return 1
+    fi
 
     info "$(_ "checking_domain"): $domain"
 
@@ -1625,7 +1661,7 @@ domain_check() {
     echo -e "\n${BOLD}$(_ "https_check"):${NC}"
     local http_code
     http_code=$(curl -fsSL --max-time 10 -o /dev/null -w "%{http_code}" "https://$domain" 2>/dev/null)
-    if [[ "$http_code" == "200" ]]; then
+    if http_status_ok "$http_code"; then
         ok "$(_ "https_accessible")"
     else
         warn "$(_ "https_not_accessible") ($(_ "http_code"): ${http_code:-N/A})"
