@@ -1,6 +1,7 @@
 # VPS QuickStart
 
-[![Версия](https://img.shields.io/badge/версия-1.1.0-blue.svg)](https://github.com/amirim1/vps-quickstart)
+[![Версия](https://img.shields.io/badge/версия-1.2.0-blue.svg)](https://github.com/amirim1/vps-quickstart)
+[![CI](https://github.com/amirim1/vps-quickstart/actions/workflows/ci.yml/badge.svg)](https://github.com/amirim1/vps-quickstart/actions/workflows/ci.yml)
 [![Лицензия](https://img.shields.io/badge/лицензия-MIT-green.svg)](LICENSE)
 [![Bash](https://img.shields.io/badge/bash-5.0%2B-orange.svg)](https://www.gnu.org/software/bash/)
 
@@ -37,6 +38,8 @@ curl -fsSL -o setup.sh https://raw.githubusercontent.com/amirim1/vps-quickstart/
 bash setup.sh
 ```
 
+Параметры командной строки: `bash setup.sh --help` — справка, `--version` — версия.
+
 ## Меню
 
 | # | Функция | Описание |
@@ -62,7 +65,7 @@ bash setup.sh
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║                    VPS QuickStart v1.1.0                     ║
+║                    VPS QuickStart v1.2.0                     ║
 ║              Professional Server Setup Script                ║
 ╚══════════════════════════════════════════════════════════════╝
 OS: Ubuntu 22.04.4 LTS
@@ -97,6 +100,10 @@ setup.sh
 - Root-доступ
 - Bash 5.0+
 - Интернет-соединение (для некоторых функций)
+
+## История изменений
+
+Смотрите [CHANGELOG.md](CHANGELOG.md) — заметки о релизах (на английском).
 
 ## Лицензия
 

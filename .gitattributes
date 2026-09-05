@@ -1,0 +1,5 @@
+# Normalize line endings: LF in the repo everywhere
+* text=auto
+
+# Bash scripts must always be LF — CRLF breaks them on Linux
+*.sh text eol=lf

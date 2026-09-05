@@ -1,6 +1,7 @@
 # VPS QuickStart
 
-[![Version](https://img.shields.io/badge/version-1.1.0-blue.svg)](https://github.com/amirim1/vps-quickstart)
+[![Version](https://img.shields.io/badge/version-1.2.0-blue.svg)](https://github.com/amirim1/vps-quickstart)
+[![CI](https://github.com/amirim1/vps-quickstart/actions/workflows/ci.yml/badge.svg)](https://github.com/amirim1/vps-quickstart/actions/workflows/ci.yml)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Bash](https://img.shields.io/badge/bash-5.0%2B-orange.svg)](https://www.gnu.org/software/bash/)
 
@@ -37,6 +38,8 @@ curl -fsSL -o setup.sh https://raw.githubusercontent.com/amirim1/vps-quickstart/
 bash setup.sh
 ```
 
+CLI options: `bash setup.sh --help` shows usage, `--version` prints the version.
+
 ## Menu
 
 | # | Feature | Description |
@@ -62,7 +65,7 @@ bash setup.sh
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║                    VPS QuickStart v1.1.0                     ║
+║                    VPS QuickStart v1.2.0                     ║
 ║              Professional Server Setup Script                ║
 ╚══════════════════════════════════════════════════════════════╝
 OS: Ubuntu 22.04.4 LTS
@@ -97,6 +100,10 @@ All operations are logged to `/var/log/vps-quickstart.log` in plain text format 
 - Root access
 - Bash 5.0+
 - Internet connection (for some features)
+
+## Changelog
+
+See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 

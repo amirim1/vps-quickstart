@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 ################################################################################
 # VPS QuickStart - Professional Server Setup Script
-# Version: 1.1.0
+# Version: 1.2.0
 # Repository: https://github.com/amirim1/vps-quickstart
 # License: MIT
 # Author: amirim1
@@ -64,7 +64,7 @@ fi
 # =============================================================================
 # CONFIGURATION SECTION - All parameters in one place
 # =============================================================================
-readonly SCRIPT_VERSION="1.1.0"
+readonly SCRIPT_VERSION="1.2.0"
 readonly SCRIPT_NAME="VPS QuickStart"
 readonly SCRIPT_REPO="https://raw.githubusercontent.com/amirim1/vps-quickstart/main"
 
