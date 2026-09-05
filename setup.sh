@@ -22,6 +22,44 @@ shopt -s inherit_errexit 2>/dev/null || true
 export LC_ALL=C
 
 # =============================================================================
+# SCRIPT IDENTITY + CLI FLAGS
+# (handled before any interactivity, so --help/--version work even without
+# a controlling terminal, e.g. `ssh host 'bash setup.sh --version'`)
+# =============================================================================
+readonly SCRIPT_VERSION="1.2.0"
+readonly SCRIPT_NAME="VPS QuickStart"
+readonly SCRIPT_REPO="https://raw.githubusercontent.com/amirim1/vps-quickstart/main"
+
+usage() {
+    cat <<EOF
+$SCRIPT_NAME v$SCRIPT_VERSION - professional interactive server setup for Debian/Ubuntu
+
+Usage:
+  bash setup.sh [OPTION]
+
+Options:
+  -h, --help       Show this help and exit
+  -V, --version    Show version and exit
+
+Without options the interactive menu starts.
+
+Quick start:
+  bash <(curl -fsSL $SCRIPT_REPO/setup.sh)
+EOF
+}
+
+case "${1:-}" in
+    -V|--version)
+        echo "$SCRIPT_NAME v$SCRIPT_VERSION"
+        exit 0
+        ;;
+    -h|--help)
+        usage
+        exit 0
+        ;;
+esac
+
+# =============================================================================
 # CURL-BASH SUPPORT: If piped, download and execute locally
 # =============================================================================
 if [[ ! -t 0 && -z "${VPSQS_CHILD:-}" ]]; then
@@ -42,8 +80,10 @@ if [[ ! -t 0 && -z "${VPSQS_CHILD:-}" ]]; then
             exit 1
         fi
 
-        if [[ -r /dev/tty ]]; then
-            VPSQS_CHILD=1 bash "$TEMP_SCRIPT" < /dev/tty
+        # Probe the controlling terminal with a throwaway redirect — a bare
+        # readability test on /dev/tty succeeds even without a terminal
+        if (exec 0</dev/tty) 2>/dev/null; then
+            VPSQS_CHILD=1 bash "$TEMP_SCRIPT" "$@" < /dev/tty
             rc=$?
             exit $rc
         fi
@@ -63,10 +103,8 @@ fi
 
 # =============================================================================
 # CONFIGURATION SECTION - All parameters in one place
+# (script identity constants live at the top, next to CLI flag handling)
 # =============================================================================
-readonly SCRIPT_VERSION="1.2.0"
-readonly SCRIPT_NAME="VPS QuickStart"
-readonly SCRIPT_REPO="https://raw.githubusercontent.com/amirim1/vps-quickstart/main"
 
 # System packages to install
 readonly PACKAGES=(
@@ -1755,10 +1793,11 @@ install_3xui() {
     fi
 }
 
-# Validate a public SSH key: "ssh-ed25519|ssh-rsa|ecdsa-... [sk-...] <base64> [comment]"
+# Validate a public SSH key: "ssh-ed25519|ssh-rsa|ecdsa-...|sk-... <base64>",
+# including certificate variants like ssh-ed25519-cert.v01@openssh.com
 validate_ssh_public_key() {
     local key="$1"
-    [[ "$key" =~ ^(sk-)?(ssh-(ed25519|rsa|dss)|ecdsa-sha2-nistp(256|384|521))(-cert\.v0[0-9]@openssh\.com)?[[:space:]]+[A-Za-z0-9+/=]+ ]]
+    [[ "$key" =~ ^(sk-)?(ssh-(ed25519|rsa|dss)|ecdsa-sha2-nistp(256|384|521))(-cert\.v0[0-9])?(@openssh\.com)?[[:space:]]+[A-Za-z0-9+/=]+ ]]
 }
 
 # 14. Create User
@@ -1876,36 +1915,7 @@ configure_sudo() {
 # MAIN LOOP
 # =============================================================================
 
-usage() {
-    cat <<EOF
-$SCRIPT_NAME v$SCRIPT_VERSION - professional interactive server setup for Debian/Ubuntu
-
-Usage:
-  bash setup.sh [OPTION]
-
-Options:
-  -h, --help       Show this help and exit
-  -V, --version    Show version and exit
-
-Without options the interactive menu starts.
-
-Quick start:
-  bash <(curl -fsSL $SCRIPT_REPO/setup.sh)
-EOF
-}
-
 main() {
-    case "${1:-}" in
-        -V|--version)
-            echo "$SCRIPT_NAME v$SCRIPT_VERSION"
-            exit 0
-            ;;
-        -h|--help)
-            usage
-            exit 0
-            ;;
-    esac
-
     # Never block apt/dpkg on interactive conffile prompts
     export DEBIAN_FRONTEND=noninteractive
 
