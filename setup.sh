@@ -724,6 +724,10 @@ check_internet() {
     if ping -c 1 -W 3 8.8.8.8 >/dev/null 2>&1 || ping -c 1 -W 3 1.1.1.1 >/dev/null 2>&1; then
         return 0
     fi
+    # ICMP is often blocked on VPS — fall back to an HTTP probe
+    if curl -fsSL --max-time 5 -o /dev/null https://www.google.com/generate_204 2>/dev/null; then
+        return 0
+    fi
     return 1
 }
 
