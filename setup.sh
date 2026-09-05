@@ -851,11 +851,36 @@ install_package() {
     fi
 }
 
-# Install multiple packages
+# Install multiple packages in a single apt-get transaction
 install_packages() {
     local pkgs=("$@")
-    local failed=0
+    local missing=()
+    local pkg
     for pkg in "${pkgs[@]}"; do
+        package_installed "$pkg" || missing+=("$pkg")
+    done
+
+    if [[ ${#missing[@]} -eq 0 ]]; then
+        ok "$(_ "all_packages_installed")"
+        return 0
+    fi
+
+    info "$(_ "installing"): ${missing[*]}"
+    wait_apt_lock || return 1
+
+    local output
+    output=$(apt-get install -y "${missing[@]}" 2>&1)
+    local rc=${PIPESTATUS[0]}
+
+    if [[ $rc -eq 0 ]]; then
+        ok "$(_ "installed"): ${missing[*]}"
+        return 0
+    fi
+
+    # Batch failed (e.g. one unavailable package) — retry one by one so a
+    # single bad package doesn't block the rest
+    local failed=0
+    for pkg in "${missing[@]}"; do
         install_package "$pkg" || failed=1
     done
     return $failed
@@ -1024,7 +1049,7 @@ update_system() {
     info "$(_ "upgrading_packages")"
     wait_apt_lock || return 1
     local output
-    output=$(apt-get upgrade -y 2>&1)
+    output=$(apt-get -y -o Dpkg::Options::=--force-confold upgrade 2>&1)
     local rc=${PIPESTATUS[0]}
 
     if [[ $rc -eq 0 ]]; then
@@ -1565,6 +1590,11 @@ network_test() {
 
 # 11. Speed Test
 speed_test() {
+    if ! check_internet; then
+        err "$(_ "internet_required")"
+        return 1
+    fi
+
     if ! command_exists "$SPEEDTEST_CMD"; then
         info "$(_ "installing_speedtest")"
         if ! install_package speedtest-cli; then
@@ -1670,6 +1700,11 @@ domain_check() {
 
 # 13. Install 3x-ui
 install_3xui() {
+    if ! check_internet; then
+        err "$(_ "internet_required")"
+        return 1
+    fi
+
     info "$(_ "installing_3xui")"
 
     if confirm "$(_ "3xui_confirm")" "Y"; then
@@ -1837,7 +1872,39 @@ configure_sudo() {
 # MAIN LOOP
 # =============================================================================
 
+usage() {
+    cat <<EOF
+$SCRIPT_NAME v$SCRIPT_VERSION - professional interactive server setup for Debian/Ubuntu
+
+Usage:
+  bash setup.sh [OPTION]
+
+Options:
+  -h, --help       Show this help and exit
+  -V, --version    Show version and exit
+
+Without options the interactive menu starts.
+
+Quick start:
+  bash <(curl -fsSL $SCRIPT_REPO/setup.sh)
+EOF
+}
+
 main() {
+    case "${1:-}" in
+        -V|--version)
+            echo "$SCRIPT_NAME v$SCRIPT_VERSION"
+            exit 0
+            ;;
+        -h|--help)
+            usage
+            exit 0
+            ;;
+    esac
+
+    # Never block apt/dpkg on interactive conffile prompts
+    export DEBIAN_FRONTEND=noninteractive
+
     # Language selection (does not require root)
     select_language
 
