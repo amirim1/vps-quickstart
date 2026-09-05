@@ -17,26 +17,48 @@
 set -o pipefail
 shopt -s inherit_errexit 2>/dev/null || true
 
+# Make external tools (grep/awk/sed/sort) locale-independent; the script's own
+# Cyrillic output is written byte-for-byte and is unaffected
+export LC_ALL=C
+
 # =============================================================================
 # CURL-BASH SUPPORT: If piped, download and execute locally
 # =============================================================================
-if [[ ! -t 0 ]]; then
-    SCRIPT_URL="https://raw.githubusercontent.com/amirim1/vps-quickstart/main/setup.sh"
-    TEMP_SCRIPT=$(mktemp --suffix=.sh)
-    trap 'rm -f "$TEMP_SCRIPT"' EXIT
+if [[ ! -t 0 && -z "${VPSQS_CHILD:-}" ]]; then
+    if [[ -p /dev/stdin ]]; then
+        # Piped (curl ... | bash): bash reads this script from the pipe, so
+        # re-download it to a real file and re-run with terminal stdin.
+        SCRIPT_URL="https://raw.githubusercontent.com/amirim1/vps-quickstart/main/setup.sh"
+        TEMP_SCRIPT=$(mktemp)
+        trap 'rm -f "$TEMP_SCRIPT"' EXIT
 
-    if ! curl -fsSL "$SCRIPT_URL" > "$TEMP_SCRIPT"; then
-        echo "[✗] Failed to download script from $SCRIPT_URL" >&2
+        if ! curl -fsSL "$SCRIPT_URL" > "$TEMP_SCRIPT"; then
+            echo "[✗] Failed to download script from $SCRIPT_URL" >&2
+            exit 1
+        fi
+
+        if [[ ! -s "$TEMP_SCRIPT" ]]; then
+            echo "[✗] Downloaded script is empty" >&2
+            exit 1
+        fi
+
+        if [[ -r /dev/tty ]]; then
+            VPSQS_CHILD=1 bash "$TEMP_SCRIPT" < /dev/tty
+            rc=$?
+            exit $rc
+        fi
+
+        echo "[✗] Interactive terminal required. Run instead:" >&2
+        echo "    curl -fsSL -o setup.sh $SCRIPT_URL && bash setup.sh" >&2
         exit 1
+    else
+        # stdin redirected from a file/device (e.g. < /dev/null): attach to
+        # the controlling terminal if there is one
+        if ! exec 0</dev/tty; then
+            echo "[✗] This script is interactive and requires a terminal (TTY)" >&2
+            exit 1
+        fi
     fi
-
-    if [[ ! -s "$TEMP_SCRIPT" ]]; then
-        echo "[✗] Downloaded script is empty" >&2
-        exit 1
-    fi
-
-    bash "$TEMP_SCRIPT"
-    exit $?
 fi
 
 # =============================================================================
@@ -539,7 +561,9 @@ select_language() {
     echo -e "  ${GREEN}$(_ "lang_en")${NC}"
     echo -e "  ${GREEN}$(_ "lang_ru")${NC}"
     echo
-    read -r -p "$(echo -e "${YELLOW}Enter choice / Введите выбор [1-2]: ${NC}")" choice
+    if ! read -r -p "$(echo -e "${YELLOW}Enter choice / Введите выбор [1-2]: ${NC}")" choice; then
+        choice=""
+    fi
 
     case "$choice" in
         2)
@@ -594,8 +618,8 @@ _log() {
 
     # Terminal: colored
     echo -e "${color}${prefix}${NC} $message"
-    # Log file: plain text
-    echo "${timestamp} ${prefix} ${message}" >> "$LOG_FILE"
+    # Log file: plain text (tolerate unwritable log, e.g. before root check)
+    echo "${timestamp} ${prefix} ${message}" >> "$LOG_FILE" 2>/dev/null || true
 }
 
 info()  { _log "INFO" "$@"; }
@@ -621,9 +645,13 @@ confirm() {
         prompt="$prompt [$(_ "yes")/$no_str]: "
     fi
 
-    read -r -p "$(echo -e "${YELLOW}${prompt}${NC}")" response
+    if ! read -r -p "$(echo -e "${YELLOW}${prompt}${NC}")" response; then
+        echo
+        return 1
+    fi
     response=${response:-$default}
-    [[ "$response" =~ ^[Yy]$ ]]
+    # Accept "y", "Y" and full-word "yes"/"YES" variants
+    [[ "$response" =~ ^[Yy]([Ee][Ss])?$ ]]
 }
 
 # Check if running as root
@@ -909,7 +937,7 @@ service_active() {
 # Press any key to continue
 press_any_key() {
     echo -e "\n${CYAN}$(_ "press_any_key")${NC}"
-    read -n 1 -s -r
+    read -n 1 -s -r || true
     echo
 }
 
@@ -1041,7 +1069,11 @@ configure_ssh() {
     # Get new port
     local new_port
     while true; do
-        read -r -p "$(echo -e "${YELLOW}$(_ "enter_ssh_port") [$current_port]: ${NC}")" new_port
+        if ! read -r -p "$(echo -e "${YELLOW}$(_ "enter_ssh_port") [$current_port]: ${NC}")" new_port; then
+            echo
+            warn "$(_ "cancelled")"
+            return 1
+        fi
         new_port=${new_port:-$current_port}
         if [[ "$new_port" =~ ^[0-9]+$ ]] && (( new_port >= 1 && new_port <= 65535 )); then
             break
@@ -1192,7 +1224,11 @@ create_swap() {
 
     local size_gb
     while true; do
-        read -r -p "$(echo -e "${YELLOW}$(_ "enter_swap_size"): ${NC}")" size_gb
+        if ! read -r -p "$(echo -e "${YELLOW}$(_ "enter_swap_size"): ${NC}")" size_gb; then
+            echo
+            warn "$(_ "cancelled")"
+            return 1
+        fi
         if [[ "$size_gb" =~ ^[0-9]+$ ]] && (( size_gb >= 1 && size_gb <= 64 )); then
             break
         fi
@@ -1287,7 +1323,10 @@ manage_ipv6() {
         echo -e "  ${RED}4)${NC} $(_ "back")"
         echo -e "${BOLD}═══════════════════════════════════════════════════════════════════════${NC}"
 
-        read -r -p "$(echo -e "${YELLOW}$(_ "select_option") [1-4]: ${NC}")" choice
+        read -r -p "$(echo -e "${YELLOW}$(_ "select_option") [1-4]: ${NC}")" choice || {
+            echo
+            return 0
+        }
 
         case "$choice" in
             1) disable_ipv6 ;;
@@ -1608,7 +1647,11 @@ install_3xui() {
 create_user() {
     local username
     while true; do
-        read -r -p "$(echo -e "${YELLOW}$(_ "enter_username"): ${NC}")" username
+        if ! read -r -p "$(echo -e "${YELLOW}$(_ "enter_username"): ${NC}")" username; then
+            echo
+            warn "$(_ "cancelled")"
+            return 1
+        fi
         if [[ -z "$username" ]]; then
             err "$(_ "username_empty")"
             continue
@@ -1626,7 +1669,11 @@ create_user() {
 
     local password
     while true; do
-        read -s -r -p "$(echo -e "${YELLOW}$(_ "enter_password"): ${NC}")" password
+        if ! read -s -r -p "$(echo -e "${YELLOW}$(_ "enter_password"): ${NC}")" password; then
+            echo
+            warn "$(_ "cancelled")"
+            return 1
+        fi
         echo
         if [[ ${#password} -ge 8 ]]; then
             break
@@ -1702,18 +1749,19 @@ configure_sudo() {
 # =============================================================================
 
 main() {
-    # Initialize log
-    mkdir -p "$(dirname "$LOG_FILE")"
-    touch "$LOG_FILE"
-    chmod 644 "$LOG_FILE"
-
-    # Language selection
+    # Language selection (does not require root)
     select_language
-
-    info "Starting $SCRIPT_NAME v$SCRIPT_VERSION"
 
     # Pre-flight checks
     check_root || exit 1
+
+    # Initialize log (requires root)
+    mkdir -p "$(dirname "$LOG_FILE")"
+    touch "$LOG_FILE" 2>/dev/null || true
+    chmod 600 "$LOG_FILE" 2>/dev/null || true
+
+    info "Starting $SCRIPT_NAME v$SCRIPT_VERSION"
+
     check_os || exit 1
     check_arch || exit 1
 
@@ -1725,7 +1773,11 @@ main() {
         print_header
         print_menu
 
-        read -r -p "$(echo -e "${YELLOW}$(_ "select_option") [1-16]: ${NC}")" choice
+        if ! read -r -p "$(echo -e "${YELLOW}$(_ "select_option") [1-16]: ${NC}")" choice; then
+            echo
+            info "$(_ "exiting")"
+            exit 0
+        fi
 
         case "$choice" in
             1) update_system ;;
